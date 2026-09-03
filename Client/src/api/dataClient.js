@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  "/api";
+  "https://marineeye.onrender.com/api";
 
 const fetchJson = async (
   endpoint,
