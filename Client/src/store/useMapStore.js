@@ -1,18 +1,18 @@
 import { create } from "zustand";
 
 const REGION = {
-  center: [9.9, 76.2],
-  zoom: 9,
+  center: [33.2, 31.6],
+  zoom: 7,
   bounds: [
-    [9.35, 75.45],
-    [10.75, 77.15],
+    [29.3, 27.12],
+    [36.37, 36.09],
   ],
 };
 
 const DEFAULT_FILTERS = {
   dateRange: [
-    "2026-06-01",
-    "2026-08-31",
+    "2019-01-01",
+    "2019-12-31",
   ],
 
   minDetectionConfidence: 0.7,

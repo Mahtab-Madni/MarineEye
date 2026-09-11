@@ -877,7 +877,7 @@ def initialise_database() -> None:
         )
 
         # Re-seed databases created before WKT geometry normalization was fixed.
-        database_version = "6"
+        database_version = "7"
 
         if current_version != database_version:
             connection.execute("DROP TABLE IF EXISTS slicks")

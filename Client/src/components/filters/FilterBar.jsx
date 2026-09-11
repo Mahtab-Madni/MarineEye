@@ -58,7 +58,7 @@ export function FilterBar() {
 
   const resetFilters = () => {
     setFilters({
-      dateRange: ["2026-06-01", "2026-08-31"],
+      dateRange: ["2019-01-01", "2019-12-31"],
       minDetectionConfidence: 0.7,
       minSlickConfidence: 0.8,
       classes: CLASS_OPTIONS.map((item) => item.value),

@@ -52,13 +52,13 @@ const BASE_LAYERS = {
 };
 
 const DEMO_REGION_BOUNDS = [
-  [9.25, 75.55],
-  [10.35, 76.65],
+  [29.3, 27.12],
+  [36.37, 36.09],
 ];
 
 const DEMO_CENTER = [
-  9.8,
-  76.1,
+  33.2,
+  31.6,
 ];
 
 const COUNTRY_BOUNDARIES_URL =
