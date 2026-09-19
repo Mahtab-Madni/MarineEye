@@ -68,6 +68,10 @@ input {
   border-bottom: 1px solid #e2e8f0 !important;
 }
 
+.leaflet-interactive:focus {
+  outline: none;
+}
+
 /* =========================================================
    GENERIC SLIDERS
    ========================================================= */
@@ -107,8 +111,12 @@ input {
   appearance: none;
   height: 5px;
   border-radius: 9999px;
-  background: #dce6e1;
+  background: transparent;
   cursor: pointer;
+}
+
+.marineeye-range::-webkit-slider-runnable-track {
+  background: transparent;
 }
 
 .marineeye-range::-webkit-slider-thumb {
@@ -116,9 +124,9 @@ input {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  border: 2px solid #f8f6ef;
-  background: #3d978b;
-  box-shadow: 0 1px 5px rgba(36, 109, 104, 0.3);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
 }
 
@@ -130,18 +138,18 @@ input {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  border: 2px solid #f8f6ef;
-  background: #3d978b;
-  box-shadow: 0 1px 5px rgba(36, 109, 104, 0.3);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
+}
+
+.marineeye-range::-moz-range-track {
+  background: transparent;
 }
 
 .marineeye-range:focus {
   outline: none;
-}
-
-.marineeye-range:focus-visible {
-  box-shadow: 0 0 0 3px rgba(61, 151, 139, 0.18);
 }
 
 /* =========================================================
