@@ -321,7 +321,7 @@ export function DriftLayer() {
 
   const circleRadius = getRadiusKm(activeStep);
 
-  const mainSlickRadius = getRadiusKm(observationStep) * 1.6;
+  const mainSlickRadius = getRadiusKm(observationStep) * 3;
 
   const handleDotClick = (event, offset) => {
     event?.originalEvent?.stopPropagation?.();
