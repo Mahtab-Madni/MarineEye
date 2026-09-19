@@ -5,9 +5,7 @@ import {
   getStrongestSignal,
 } from "../../utils/attribution";
 
-const getSourceName = (
-  source,
-) =>
+const getSourceName = (source) =>
   source?.name ??
   source?.id ??
   source?.source_id ??
@@ -15,49 +13,31 @@ const getSourceName = (
   source?.infra_id ??
   "Unknown source";
 
-const getSourceType = (
-  source,
-) => {
-  if (
-    source?.type ===
-    "dark_vessel"
-  ) {
+const getSourceType = (source) => {
+  if (source?.type === "dark_vessel") {
     return "Dark vessel";
   }
 
-  if (
-    source?.type ===
-    "infrastructure"
-  ) {
+  if (source?.type === "infrastructure") {
     return "Infrastructure";
   }
 
   return "AIS vessel";
 };
 
-const getSourceIcon = (
-  source,
-) => {
-  if (
-    source?.type ===
-    "dark_vessel"
-  ) {
+const getSourceIcon = (source) => {
+  if (source?.type === "dark_vessel") {
     return "DV";
   }
 
-  if (
-    source?.type ===
-    "infrastructure"
-  ) {
+  if (source?.type === "infrastructure") {
     return "INF";
   }
 
   return "AIS";
 };
 
-const getSourceId = (
-  source,
-) =>
+const getSourceId = (source) =>
   String(
     source?.id ??
       source?.source_id ??
@@ -66,29 +46,17 @@ const getSourceId = (
       "",
   );
 
-export function SourceCard({
-  source,
-  rank,
-  selected = false,
-  onSelect,
-}) {
-  const signals =
-    getAttributionSignals(
-      source,
-    );
+export function SourceCard({ source, rank, selected = false, onSelect }) {
+  const signals = getAttributionSignals(source);
 
-  const score =
-    getSourceScore(source);
+  const score = getSourceScore(source);
 
-  const sourceId =
-    getSourceId(source);
+  const sourceId = getSourceId(source);
 
   return (
     <button
       type="button"
-      onClick={() =>
-        onSelect?.(sourceId)
-      }
+      onClick={() => onSelect?.(sourceId)}
       className={`block w-full rounded-xl border p-3.5 text-left shadow-[0_5px_15px_rgba(48,65,62,0.05)] transition ${
         selected
           ? "border-[#4bafa0] bg-[#edf7f3] shadow-[0_7px_20px_rgba(45,111,103,0.12)]"
@@ -106,9 +74,7 @@ export function SourceCard({
                 : "bg-[#e3eee9] text-[#246d68]"
             }`}
           >
-            {getSourceIcon(
-              source,
-            )}
+            {getSourceIcon(source)}
           </span>
 
           <div className="min-w-0">
@@ -126,16 +92,12 @@ export function SourceCard({
               )}
 
               <p className="truncate text-sm font-semibold text-[#253642]">
-                {getSourceName(
-                  source,
-                )}
+                {getSourceName(source)}
               </p>
             </div>
 
             <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[#7a8788]">
-              {getSourceType(
-                source,
-              )}
+              {getSourceType(source)}
             </p>
           </div>
         </div>
@@ -161,9 +123,7 @@ export function SourceCard({
             </p>
 
             <p className="mt-1 text-[10px] font-semibold text-[#3d706b]">
-              {getStrongestSignal(
-                source,
-              )}
+              {getStrongestSignal(source)}
             </p>
           </div>
 
@@ -182,69 +142,46 @@ export function SourceCard({
             Attribution evidence
           </p>
 
-          <span className="text-[9px] text-[#879394]">
+          <span
+            className="cursor-help text-[9px] text-[#879394]"
+            title="The fused score ranks candidates. Evidence bars are signal strengths, not probabilities."
+          >
             Dataset fused score
           </span>
         </div>
 
         <p className="mt-1 text-[9px] leading-4 text-[#879394]">
-          Higher bars indicate
-          stronger individual signals.
-          They explain the ranking but
-          are not probabilities.
+          Higher bars indicate stronger individual signals. They explain the
+          ranking but are not probabilities.
         </p>
       </div>
 
       {signals.length ? (
         <div className="space-y-2.5">
-          {signals.map(
-            (signal) => (
-              <div
-                key={
-                  signal.key
-                }
-              >
-                <div className="mb-1 flex items-center justify-between text-[10px] text-[#53696d]">
-                  <span>
-                    {
-                      signal.label
-                    }
-                  </span>
+          {signals.map((signal) => (
+            <div key={signal.key}>
+              <div className="mb-1 flex items-center justify-between text-[10px] text-[#53696d]">
+                <span>{signal.label}</span>
 
-                  <span className="font-medium">
-                    {formatScore(
-                      signal.score,
-                    )}
-                  </span>
-                </div>
-
-                <div className="h-1.5 overflow-hidden rounded-full bg-[#dbe4df]">
-                  <div
-                    className="h-full rounded-full bg-[#4bafa0]"
-                    style={{
-                      width: `${
-                        Math.max(
-                          0,
-                          Math.min(
-                            1,
-                            Number(
-                              signal.score,
-                            ) || 0,
-                          ),
-                        ) * 100
-                      }%`,
-                    }}
-                  />
-                </div>
+                <span className="font-medium">{formatScore(signal.score)}</span>
               </div>
-            ),
-          )}
+
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#dbe4df]">
+                <div
+                  className="h-full rounded-full bg-[#4bafa0]"
+                  style={{
+                    width: `${
+                      Math.max(0, Math.min(1, Number(signal.score) || 0)) * 100
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <p className="rounded-lg bg-[#edf1ee] px-2.5 py-2 text-[10px] leading-4 text-[#718083]">
-          No individual evidence
-          signals are available for
-          this candidate.
+          No individual evidence signals are available for this candidate.
         </p>
       )}
 

@@ -4,7 +4,7 @@ import csv
 import json
 import math
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -365,8 +365,16 @@ def build_drift_cone(
     for index in range(5):
         hours = -48 + index * 12
 
-        drift_longitude = longitude - 0.012 * index
-        drift_latitude = latitude + 0.004 * index
+        steps_from_observation = 4 - index
+
+        drift_longitude = (
+            longitude -
+            0.014 * steps_from_observation
+        )
+        drift_latitude = (
+            latitude -
+            0.006 * steps_from_observation
+        )
 
         radius_km = 1.5 + index * 0.9
 
@@ -381,13 +389,23 @@ def build_drift_cone(
             }
         )
 
+    observation = {
+        "t_offset_hours": 0,
+        "phase": "observation",
+        "radius_km": 1.2,
+        "center": [
+            round(longitude, 6),
+            round(latitude, 6),
+        ],
+    }
+
     forecast = []
 
     for index in range(4):
         hours = (index + 1) * 12
 
-        drift_longitude = longitude + 0.014 * index
-        drift_latitude = latitude + 0.006 * index
+        drift_longitude = longitude + 0.014 * (index + 1)
+        drift_latitude = latitude + 0.006 * (index + 1)
 
         radius_km = 2.0 + index * 1.2
 
@@ -403,6 +421,7 @@ def build_drift_cone(
         )
 
     return {
+        "observation": observation,
         "hindcast": hindcast,
         "forecast": forecast,
     }
@@ -450,6 +469,59 @@ def normalize_source(row: dict[str, Any]) -> dict[str, Any]:
     }:
         source_type = "vessel"
 
+    cpa = to_float(
+        first_value(
+            row,
+            "cpa",
+            "cpa_score",
+        ),
+        0.0,
+    )
+
+    tcpa = to_float(
+        first_value(
+            row,
+            "tcpa",
+            "tcpa_score",
+        ),
+        0.0,
+    )
+
+    drift_overlap = to_float(
+        first_value(
+            row,
+            "drift_overlap",
+            "drift_overlap_score",
+        ),
+        0.0,
+    )
+
+    proximity = to_float(
+        first_value(
+            row,
+            "proximity",
+            "proximity_score",
+        )
+    )
+
+    trajectory_match = to_float(
+        first_value(
+            row,
+            "trajectory_match",
+            "trajectory_score",
+            "trajectory_match_score",
+        )
+    )
+
+    if proximity is None:
+        proximity = cpa
+
+    if trajectory_match is None:
+        trajectory_match = round(
+            (tcpa + drift_overlap) / 2,
+            6,
+        )
+
     source = {
         "id": str(source_id),
         "type": source_type,
@@ -462,52 +534,17 @@ def normalize_source(row: dict[str, Any]) -> dict[str, Any]:
             ),
             0.0,
         ),
-        "proximity": to_float(
-            first_value(
-                row,
-                "proximity",
-                "proximity_score",
-            ),
-            0.0,
-        ),
-        "trajectory_match": to_float(
-            first_value(
-                row,
-                "trajectory_match",
-                "trajectory_score",
-                "trajectory_match_score",
-            ),
-            0.0,
-        ),
-        "cpa": to_float(
-            first_value(
-                row,
-                "cpa",
-                "cpa_score",
-            ),
-            0.0,
-        ),
-        "tcpa": to_float(
-            first_value(
-                row,
-                "tcpa",
-                "tcpa_score",
-            ),
-            0.0,
-        ),
-        "drift_overlap": to_float(
-            first_value(
-                row,
-                "drift_overlap",
-                "drift_overlap_score",
-            ),
-            0.0,
-        ),
+        "proximity": proximity,
+        "trajectory_match": trajectory_match,
+        "cpa": cpa,
+        "tcpa": tcpa,
+        "drift_overlap": drift_overlap,
         "ais_gap": to_float(
             first_value(
                 row,
                 "ais_gap",
                 "ais_gap_score",
+                "ais_gap_anomaly",
             ),
             0.0,
         ),
@@ -516,6 +553,7 @@ def normalize_source(row: dict[str, Any]) -> dict[str, Any]:
                 row,
                 "behavior",
                 "behavior_score",
+                "behavioral_anomaly",
             ),
             0.0,
         ),
@@ -696,6 +734,7 @@ def normalize_ais_tracks(
         headings: list[float] = []
 
         related_source_id = None
+        linked_slick_ids: set[str] = set()
 
         for row in vessel_rows:
             longitude = to_float(
@@ -753,6 +792,7 @@ def normalize_ais_tracks(
                 first_value(
                     row,
                     "heading",
+                    "heading_deg",
                     "course",
                     "cog",
                     "direction",
@@ -761,6 +801,17 @@ def normalize_ais_tracks(
 
             if heading is not None:
                 headings.append(heading)
+
+            linked_slick_id = first_value(
+                row,
+                "linked_slick_id",
+                "slick_id",
+                "detection_id",
+                "related_slick_id",
+            )
+
+            if linked_slick_id is not None:
+                linked_slick_ids.add(str(linked_slick_id))
 
             source = first_value(
                 row,
@@ -789,6 +840,7 @@ def normalize_ais_tracks(
                     2,
                 ),
                 "related_source_id": related_source_id,
+                "linked_slick_ids": sorted(linked_slick_ids),
             }
         )
 
@@ -877,7 +929,7 @@ def initialise_database() -> None:
         )
 
         # Re-seed databases created before WKT geometry normalization was fixed.
-        database_version = "7"
+        database_version = "13"
 
         if current_version != database_version:
             connection.execute("DROP TABLE IF EXISTS slicks")
@@ -1122,19 +1174,38 @@ def get_data(
             track
             for track in ais_tracks
             if (
-                track.get("related_source_id") in related_source_ids
-                or track.get("related_source_id") is None
+                slick_id in {
+                    str(linked_id)
+                    for linked_id in track.get(
+                        "linked_slick_ids",
+                        [],
+                    )
+                }
+                or track.get("related_source_id") in related_source_ids
             )
         ]
 
         return {
             "slicks": [slick],
             "aisTracks": related_tracks,
+            "meta": {
+                "generatedAt": datetime.now(timezone.utc).isoformat(),
+                "source": "fastapi",
+            },
         }
 
+    slicks = get_all_slicks()
+    ais_tracks = get_all_ais_tracks()
+
     return {
-        "slicks": get_all_slicks(),
-        "aisTracks": get_all_ais_tracks(),
+        "slicks": slicks,
+        "aisTracks": ais_tracks,
+        "meta": {
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "source": "fastapi",
+            "slickCount": len(slicks),
+            "aisTrackCount": len(ais_tracks),
+        },
     }
 
 

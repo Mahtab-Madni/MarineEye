@@ -1,47 +1,24 @@
-# MarineEye Change Log
+# MARIS-X Website Updates
 
-This document summarizes the changes i have done to make ui looks better.
+## Product Name
 
-## Current Status
+- Renamed the website from MarineEye to **MARIS-X**.
 
-- The MarineEye investigation console is implemented as a React and Vite client with a FastAPI and SQLite backend.
-- The backend imports the supplied CSV fixtures into a local SQLite database on first startup.
-- A project virtual environment was created at `.venv` in the SIH2026 root and populated with the backend requirements.
-- The client production build has been validated successfully during development.
+## Changes Made
 
-## Recent UI Refinements
+- Corrected the backend mapping for AIS gap and behavioral anomaly values, so those evidence bars no longer incorrectly show zero.
+- Added a map legend for slick detections, AIS tracks, and drift forecasts.
+- Added loading feedback while marine data is being retrieved.
+- Added an error message and retry option when the backend and local data are unavailable.
+- Added selected-vessel details for speed, heading, observation count, and latest AIS observation time.
+- Corrected AIS heading display so the vessel heading is read from the dataset instead of defaulting to 0 degrees.
+- Added an explanation that attribution bars show evidence strength, not probability or proof of responsibility.
+- Added a Reset button that clears the investigation filters and restores their default values.
+- Added source search by vessel ID or evidence factor.
+- Added the latest data update time to the application header.
+- Added the real link between AIS tracks and slick detections, so an investigation shows the vessels associated with that slick.
+- Corrected drift timeline geometry so hindcast positions move toward the 0H observation and forecast positions continue forward from it.
+- Added an explicit observation center and corrected the stale SQLite seed data by bumping the database schema version.
+- Added frontend fallback handling for older API responses that do not include an explicit observation point.
+- Kept the drift movement clearly marked as deterministic demo data; it is not a scientific ocean-current prediction.
 
-These changes are currently present in the working tree after the latest commit and are not yet represented by a Git commit.
-
-### Application layout
-
-- Locked the application to the viewport so the full webpage does not create an unnecessary page-level scrollbar.
-- Sized the map and content region from the actual available viewport height.
-- Preserved scrolling inside the filter panel.
-- Adjusted the bottom dataset status bar position slightly to the left.
-
-### Date range picker
-
-- Changed the picker to render above surrounding layout clipping boundaries.
-- Made the picker responsive to the viewport width.
-- Kept the picker aligned with the observation window while the filter panel scrolls.
-- Added header-boundary protection so the picker does not move underneath the website header.
-- Ensured the picker remains below the header when the observation window scrolls behind it.
-- Added responsive internal scrolling for smaller viewports.
-
-### Connection status indicator
-
-- Made the API or prototype status badge background transparent.
-- Kept the status text color dependent on the active data source.
-- Added a pulse animation to the complete status badge, including its text and status dot.
-
-### Interface cleanup
-
-- Refined spacing and compactness in the header and filter interface.
-- Adjusted status bar padding and alignment.
-- Applied formatting and layout cleanup across the main application and supporting investigation components.
-
-## Verification
-
-- The client production build completed successfully after the recent UI changes.
-- Editor diagnostics reported no errors in the files changed for the UI refinements.

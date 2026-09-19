@@ -29,10 +29,32 @@ function LoadingState() {
             </p>
 
             <p className="mt-1 text-[11px] text-[#718083]">
-              Connecting to MarineEye data service…
+              Connecting to MARIS-X data service…
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }) {
+  return (
+    <div className="absolute inset-0 z-[850] flex items-center justify-center bg-[#d7e0dc]/55 px-4 backdrop-blur-[2px]">
+      <div className="max-w-sm rounded-2xl border border-[#d6b8ae] bg-[#fffaf5] px-6 py-5 text-center shadow-xl">
+        <p className="text-sm font-semibold text-[#704b43]">
+          Unable to load marine observations
+        </p>
+
+        <p className="mt-2 text-[11px] leading-5 text-[#8b6f69]">{message}</p>
+
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-4 rounded-lg border border-[#c99e91] bg-white px-3 py-2 text-[11px] font-semibold text-[#704b43] transition hover:bg-[#fff1e9]"
+        >
+          Retry connection
+        </button>
       </div>
     </div>
   );
@@ -65,7 +87,7 @@ function EmptyState({ hasData }) {
         <p className="mt-1 text-[11px] leading-5 text-[#718083]">
           {hasData
             ? "Try lowering the confidence thresholds, expanding the date range, or enabling additional filters."
-            : "MarineEye could not find any normalized slick records to display."}
+            : "MARIS-X could not find any normalized slick records to display."}
         </p>
       </div>
     </div>
@@ -120,6 +142,12 @@ export default function App() {
 
   const [dataSource, setDataSource] = useState("unknown");
 
+  const [loadError, setLoadError] = useState("");
+
+  const [dataUpdatedAt, setDataUpdatedAt] = useState(null);
+
+  const [reloadToken, setReloadToken] = useState(0);
+
   const [isReportOpen, setIsReportOpen] = useState(false);
 
   const [openMenu, setOpenMenu] = useState(null);
@@ -155,6 +183,7 @@ export default function App() {
 
     const loadData = async () => {
       setIsLoading(true);
+      setLoadError("");
 
       try {
         const response = await getMarineEyeData();
@@ -170,9 +199,12 @@ export default function App() {
         );
 
         setDataSource("backend");
+        setDataUpdatedAt(
+          response?.meta?.generatedAt ?? new Date().toISOString(),
+        );
       } catch (backendError) {
         console.warn(
-          "MarineEye API unavailable; falling back to local prototype data.",
+          "MARIS-X API unavailable; falling back to local prototype data.",
           backendError,
         );
 
@@ -190,6 +222,7 @@ export default function App() {
           );
 
           setDataSource("mock");
+          setDataUpdatedAt(new Date().toISOString());
         } catch (mockError) {
           if (cancelled) {
             return;
@@ -200,6 +233,9 @@ export default function App() {
           setSlicks([]);
           setAISTracks([]);
           setDataSource("none");
+          setLoadError(
+            "The FastAPI service and local prototype data are both unavailable.",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -213,7 +249,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [setAISTracks, setSlicks]);
+  }, [reloadToken, setAISTracks, setSlicks]);
 
   return (
     <div
@@ -232,8 +268,8 @@ export default function App() {
           <div className="flex items-center gap-4">
             <div>
               <span className="text-[1.3rem] font-semibold tracking-tight text-slate-900">
-                Marine
-                <span className="text-[#258f86]">Eye</span>
+                MARIS-
+                <span className="text-[#258f86]">X</span>
               </span>
 
               <div className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.24em] text-[#7b8788]">
@@ -278,6 +314,16 @@ export default function App() {
                   : "No data"}
             </div>
 
+            {dataUpdatedAt && (
+              <span className="hidden text-[9px] text-[#879394] lg:inline">
+                Updated{" "}
+                {new Date(dataUpdatedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+
             <HeaderMenu
               title="Help"
               open={openMenu === "help"}
@@ -285,7 +331,7 @@ export default function App() {
             >
               <div className="border-b border-[#dfe4df] px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#718083]">
-                  MarineEye guide
+                  MARIS-X guide
                 </p>
 
                 <p className="mt-1 text-sm font-semibold text-[#344b4e]">
@@ -434,7 +480,14 @@ export default function App() {
 
           {isLoading && <LoadingState />}
 
-          {!isLoading && visibleSlicks.length === 0 && (
+          {!isLoading && loadError && (
+            <ErrorState
+              message={loadError}
+              onRetry={() => setReloadToken((value) => value + 1)}
+            />
+          )}
+
+          {!isLoading && !loadError && visibleSlicks.length === 0 && (
             <EmptyState hasData={slicks.length > 0} />
           )}
 

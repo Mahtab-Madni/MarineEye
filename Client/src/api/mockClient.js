@@ -1,6 +1,4 @@
-const parseCsv = (
-  text,
-) => {
+const parseCsv = (text) => {
   const rows = [];
 
   let row = [];
@@ -9,58 +7,29 @@ const parseCsv = (
 
   let quoted = false;
 
-  for (
-    let index = 0;
-    index < text.length;
-    index += 1
-  ) {
-    const character =
-      text[index];
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
 
-    const nextCharacter =
-      text[index + 1];
+    const nextCharacter = text[index + 1];
 
-    if (
-      character === '"' &&
-      quoted &&
-      nextCharacter === '"'
-    ) {
+    if (character === '"' && quoted && nextCharacter === '"') {
       value += '"';
 
       index += 1;
-    } else if (
-      character === '"'
-    ) {
+    } else if (character === '"') {
       quoted = !quoted;
-    } else if (
-      character === "," &&
-      !quoted
-    ) {
+    } else if (character === "," && !quoted) {
       row.push(value);
 
       value = "";
-    } else if (
-      (
-        character === "\n" ||
-        character === "\r"
-      ) &&
-      !quoted
-    ) {
-      if (
-        character === "\r" &&
-        nextCharacter === "\n"
-      ) {
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && nextCharacter === "\n") {
         index += 1;
       }
 
       row.push(value);
 
-      if (
-        row.some(
-          (cell) =>
-            cell.trim() !== "",
-        )
-      ) {
+      if (row.some((cell) => cell.trim() !== "")) {
         rows.push(row);
       }
 
@@ -68,23 +37,14 @@ const parseCsv = (
 
       value = "";
     } else {
-      value +=
-        character;
+      value += character;
     }
   }
 
-  if (
-    value.length ||
-    row.length
-  ) {
+  if (value.length || row.length) {
     row.push(value);
 
-    if (
-      row.some(
-        (cell) =>
-          cell.trim() !== "",
-      )
-    ) {
+    if (row.some((cell) => cell.trim() !== "")) {
       rows.push(row);
     }
   }
@@ -93,73 +53,32 @@ const parseCsv = (
     return [];
   }
 
-  const headers =
-    rows[0].map(
-      (header) =>
-        String(
-          header,
-        ).trim(),
-    );
+  const headers = rows[0].map((header) => String(header).trim());
 
   return rows
     .slice(1)
-    .map(
-      (dataRow) =>
-        Object.fromEntries(
-          headers.map(
-            (
-              header,
-              index,
-            ) => [
-              header,
-              dataRow[
-                index
-              ]?.trim() ??
-                "",
-            ],
-          ),
-        ),
+    .map((dataRow) =>
+      Object.fromEntries(
+        headers.map((header, index) => [header, dataRow[index]?.trim() ?? ""]),
+      ),
     );
 };
 
-const asNumber = (
-  value,
-  fallback = 0,
-) => {
-  const number =
-    Number(value);
+const asNumber = (value, fallback = 0) => {
+  const number = Number(value);
 
-  return Number.isFinite(
-    number,
-  )
-    ? number
-    : fallback;
+  return Number.isFinite(number) ? number : fallback;
 };
 
-const asBoolean = (
-  value,
-) =>
-  [
-    "true",
-    "1",
-    "yes",
-    "y",
-    "on",
-  ].includes(
-    String(
-      value ?? "",
-    )
+const asBoolean = (value) =>
+  ["true", "1", "yes", "y", "on"].includes(
+    String(value ?? "")
       .trim()
       .toLowerCase(),
   );
 
-const polygonFromWkt = (
-  value,
-) => {
-  const text =
-    String(
-      value ?? "",
-    ).trim();
+const polygonFromWkt = (value) => {
+  const text = String(value ?? "").trim();
 
   if (!text) {
     return {
@@ -169,44 +88,20 @@ const polygonFromWkt = (
   }
 
   try {
-    const body =
-      text
-        .replace(
-          /^POLYGON\s*\(\(/i,
-          "",
-        )
-        .replace(
-          /\)\)\s*$/i,
-          "",
-        );
+    const body = text.replace(/^POLYGON\s*\(\(/i, "").replace(/\)\)\s*$/i, "");
 
-    const ring =
-      body.split(
-        ",",
-      ).map(
-        (pair) =>
-          pair
-            .trim()
-            .split(/\s+/)
-            .map(Number),
-      );
+    const ring = body
+      .split(",")
+      .map((pair) => pair.trim().split(/\s+/).map(Number));
 
     const valid =
       ring.length >= 3 &&
-      ring.every(
-        (pair) =>
-          pair.length >= 2 &&
-          pair.every(
-            Number.isFinite,
-          ),
-      );
+      ring.every((pair) => pair.length >= 2 && pair.every(Number.isFinite));
 
     return valid
       ? {
           type: "Polygon",
-          coordinates: [
-            ring,
-          ],
+          coordinates: [ring],
         }
       : {
           type: "Polygon",
@@ -220,90 +115,55 @@ const polygonFromWkt = (
   }
 };
 
-const buildDriftCone = (
-  centerLat,
-  centerLng,
-) => ({
-  hindcast:
-    Array.from(
-      {
-        length: 5,
-      },
-      (_, index) => ({
-        t_offset_hours:
-          -48 +
-          index * 12,
+const buildDriftCone = (centerLat, centerLng) => ({
+  observation: {
+    t_offset_hours: 0,
+    phase: "observation",
+    center: [centerLng, centerLat],
+    radius_km: 1.2,
+  },
 
-        center: [
-          centerLng -
-            0.012 *
-              index,
+  hindcast: Array.from(
+    {
+      length: 5,
+    },
+    (_, index) => ({
+      t_offset_hours: -48 + index * 12,
 
-          centerLat +
-            0.004 *
-              index,
-        ],
+      center: [
+        centerLng - 0.014 * (4 - index),
 
-        radius_km:
-          Number(
-            (
-              1.5 +
-              index *
-                0.9
-            ).toFixed(
-              2,
-            ),
-          ),
-      }),
-    ),
+        centerLat - 0.006 * (4 - index),
+      ],
 
-  forecast:
-    Array.from(
-      {
-        length: 4,
-      },
-      (_, index) => ({
-        t_offset_hours:
-          12 +
-          index * 12,
+      radius_km: Number((1.5 + index * 0.9).toFixed(2)),
+    }),
+  ),
 
-        center: [
-          centerLng +
-            0.014 *
-              (index + 1),
+  forecast: Array.from(
+    {
+      length: 4,
+    },
+    (_, index) => ({
+      t_offset_hours: 12 + index * 12,
 
-          centerLat +
-            0.006 *
-              (index + 1),
-        ],
+      center: [
+        centerLng + 0.014 * (index + 1),
 
-        radius_km:
-          Number(
-            (
-              2 +
-              index *
-                1.2
-            ).toFixed(
-              2,
-            ),
-          ),
-      }),
-    ),
+        centerLat + 0.006 * (index + 1),
+      ],
+
+      radius_km: Number((2 + index * 1.2).toFixed(2)),
+    }),
+  ),
 });
 
-const fetchText = async (
-  path,
-) => {
-  const response =
-    await fetch(
-      path,
-      {
-        headers: {
-          Accept:
-            "text/csv",
-        },
-      },
-    );
+const fetchText = async (path) => {
+  const response = await fetch(path, {
+    headers: {
+      Accept: "text/csv",
+    },
+  });
 
   if (!response.ok) {
     throw new Error(
@@ -314,268 +174,145 @@ const fetchText = async (
   return response.text();
 };
 
-export const getMarineEyeData =
-  async () => {
-    const [
-      slickText,
-      sourceText,
-      aisText,
-    ] = await Promise.all([
-      fetchText(
-        "/mock_slick_detections.csv",
-      ),
+export const getMarineEyeData = async () => {
+  const [slickText, sourceText, aisText] = await Promise.all([
+    fetchText("/mock_slick_detections.csv"),
 
-      fetchText(
-        "/mock_sources.csv",
-      ),
+    fetchText("/mock_sources.csv"),
 
-      fetchText(
-        "/mock_ais_tracks.csv",
-      ),
-    ]);
+    fetchText("/mock_ais_tracks.csv"),
+  ]);
 
-    const slickRows =
-      parseCsv(
-        slickText,
-      );
+  const slickRows = parseCsv(slickText);
 
-    const sourceRows =
-      parseCsv(
-        sourceText,
-      );
+  const sourceRows = parseCsv(sourceText);
 
-    const aisRows =
-      parseCsv(
-        aisText,
-      );
+  const aisRows = parseCsv(aisText);
 
-    const sourcesBySlick =
-      sourceRows.reduce(
-        (
-          groups,
-          row,
-        ) => {
-          const source = {
-            id:
-              row.source_id ||
-              row.vessel_id ||
-              row.infra_id ||
-              "unknown-source",
+  const sourcesBySlick = sourceRows.reduce((groups, row) => {
+    const cpa = asNumber(row.cpa);
 
-            type:
-              row.type ||
-              "vessel",
+    const tcpa = asNumber(row.tcpa);
 
-            sub_scores: {
-              cpa: asNumber(
-                row.cpa,
-              ),
+    const driftOverlap = asNumber(row.drift_overlap);
 
-              tcpa: asNumber(
-                row.tcpa,
-              ),
+    const source = {
+      id: row.source_id || row.vessel_id || row.infra_id || "unknown-source",
 
-              drift_overlap:
-                asNumber(
-                  row.drift_overlap,
-                ),
+      type: row.type || "vessel",
 
-              ais_gap_anomaly:
-                asNumber(
-                  row.ais_gap_anomaly,
-                ),
+      sub_scores: {
+        proximity: row.proximity ? asNumber(row.proximity) : cpa,
 
-              behavioral_anomaly:
-                asNumber(
-                  row.behavioral_anomaly,
-                ),
-            },
+        trajectory_match: row.trajectory_match
+          ? asNumber(row.trajectory_match)
+          : (tcpa + driftOverlap) / 2,
 
-            fused_score:
-              asNumber(
-                row.fused_score,
-              ),
+        cpa,
 
-            dominant_factor:
-              row.dominant_factor ||
-              "",
+        tcpa,
 
-            navic_tracked:
-              asBoolean(
-                row.navic_tracked,
-              ),
-          };
+        drift_overlap: driftOverlap,
 
-          (
-            groups[
-              row.slick_id
-            ] ??= []
-          ).push(source);
+        ais_gap_anomaly: asNumber(row.ais_gap_anomaly),
 
-          return groups;
-        },
-        {},
-      );
+        behavioral_anomaly: asNumber(row.behavioral_anomaly),
+      },
 
-    const slicks =
-      slickRows
-        .map(
-          (row) => ({
-            id: row.id,
+      fused_score: asNumber(row.fused_score),
 
-            polygon:
-              polygonFromWkt(
-                row.polygon_wkt,
-              ),
+      dominant_factor: row.dominant_factor || "",
 
-            class:
-              row.class ||
-              "ambiguous",
-
-            detection_confidence:
-              asNumber(
-                row.detection_confidence,
-              ),
-
-            slick_confidence:
-              asNumber(
-                row.slick_confidence,
-              ),
-
-            area:
-              asNumber(
-                row.area_km2,
-              ),
-
-            age_estimate:
-              asNumber(
-                row.age_estimate_hours,
-              ),
-
-            timestamp:
-              row.timestamp ||
-              "",
-
-            hitl_reviewed:
-              asBoolean(
-                row.hitl_reviewed,
-              ),
-
-            drift:
-              buildDriftCone(
-                asNumber(
-                  row.centroid_lat,
-                ),
-
-                asNumber(
-                  row.centroid_lon,
-                ),
-              ),
-
-            sources:
-              (
-                sourcesBySlick[
-                  row.id
-                ] ?? []
-              ).slice(0, 3),
-          }),
-        )
-        .filter(
-          (slick) =>
-            slick.id,
-        );
-
-    const tracksByVessel =
-      aisRows.reduce(
-        (
-          groups,
-          row,
-        ) => {
-          const vesselId =
-            row.vessel_id ||
-            row.source_id;
-
-          if (!vesselId) {
-            return groups;
-          }
-
-          const track =
-            (groups[
-              vesselId
-            ] ??= {
-              vessel_id:
-                vesselId,
-
-              related_source_id:
-                vesselId,
-
-              positions: [],
-
-              timestamps: [],
-
-              speed: 0,
-
-              heading: 0,
-            });
-
-          const longitude =
-            asNumber(
-              row.lon,
-              NaN,
-            );
-
-          const latitude =
-            asNumber(
-              row.lat,
-              NaN,
-            );
-
-          if (
-            Number.isFinite(
-              longitude,
-            ) &&
-            Number.isFinite(
-              latitude,
-            )
-          ) {
-            track.positions.push(
-              [
-                longitude,
-                latitude,
-              ],
-            );
-
-            track.timestamps.push(
-              row.timestamp ||
-                "",
-            );
-          }
-
-          track.speed =
-            asNumber(
-              row.speed_knots,
-              track.speed,
-            );
-
-          track.heading =
-            asNumber(
-              row.heading_deg,
-              track.heading,
-            );
-
-          return groups;
-        },
-        {},
-      );
-
-    return {
-      slicks,
-      aisTracks:
-        Object.values(
-          tracksByVessel,
-        ),
+      navic_tracked: asBoolean(row.navic_tracked),
     };
+
+    (groups[row.slick_id] ??= []).push(source);
+
+    return groups;
+  }, {});
+
+  const slicks = slickRows
+    .map((row) => ({
+      id: row.id,
+
+      polygon: polygonFromWkt(row.polygon_wkt),
+
+      class: row.class || "ambiguous",
+
+      detection_confidence: asNumber(row.detection_confidence),
+
+      slick_confidence: asNumber(row.slick_confidence),
+
+      area: asNumber(row.area_km2),
+
+      age_estimate: asNumber(row.age_estimate_hours),
+
+      timestamp: row.timestamp || "",
+
+      hitl_reviewed: asBoolean(row.hitl_reviewed),
+
+      drift: buildDriftCone(
+        asNumber(row.centroid_lat),
+
+        asNumber(row.centroid_lon),
+      ),
+
+      sources: (sourcesBySlick[row.id] ?? []).slice(0, 3),
+    }))
+    .filter((slick) => slick.id);
+
+  const tracksByVessel = aisRows.reduce((groups, row) => {
+    const vesselId = row.vessel_id || row.source_id;
+
+    if (!vesselId) {
+      return groups;
+    }
+
+    const track = (groups[vesselId] ??= {
+      vessel_id: vesselId,
+
+      related_source_id: vesselId,
+
+      positions: [],
+
+      timestamps: [],
+
+      speed: 0,
+
+      heading: 0,
+
+      linked_slick_ids: [],
+    });
+
+    const longitude = asNumber(row.lon, NaN);
+
+    const latitude = asNumber(row.lat, NaN);
+
+    if (Number.isFinite(longitude) && Number.isFinite(latitude)) {
+      track.positions.push([longitude, latitude]);
+
+      track.timestamps.push(row.timestamp || "");
+    }
+
+    track.speed = asNumber(row.speed_knots, track.speed);
+
+    track.heading = asNumber(row.heading_deg, track.heading);
+
+    if (
+      row.linked_slick_id &&
+      !track.linked_slick_ids.includes(row.linked_slick_id)
+    ) {
+      track.linked_slick_ids.push(row.linked_slick_id);
+    }
+
+    return groups;
+  }, {});
+
+  return {
+    slicks,
+    aisTracks: Object.values(tracksByVessel),
   };
+};
 
 export default {
   getMarineEyeData,

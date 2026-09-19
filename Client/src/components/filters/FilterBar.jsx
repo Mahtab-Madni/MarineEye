@@ -55,17 +55,7 @@ const SOURCE_OPTIONS = [
 export function FilterBar() {
   const filters = useMapStore((state) => state.filters);
   const setFilters = useMapStore((state) => state.setFilters);
-
-  const resetFilters = () => {
-    setFilters({
-      dateRange: ["2019-01-01", "2019-12-31"],
-      minDetectionConfidence: 0.7,
-      minSlickConfidence: 0.8,
-      classes: CLASS_OPTIONS.map((item) => item.value),
-      sourceTypes: SOURCE_OPTIONS.map((item) => item.value),
-      reviewStatus: "all",
-    });
-  };
+  const resetFilters = useMapStore((state) => state.resetFilters);
 
   const toggleClass = (value) => {
     const current = filters.classes;
@@ -131,9 +121,7 @@ export function FilterBar() {
 
           <DateRangeFilter
             value={filters.dateRange}
-            onChange={(nextRange) =>
-              setFilters({ dateRange: nextRange })
-            }
+            onChange={(nextRange) => setFilters({ dateRange: nextRange })}
           />
         </section>
 
@@ -152,13 +140,10 @@ export function FilterBar() {
             min="50"
             max="100"
             step="1"
-            value={Math.round(
-              filters.minDetectionConfidence * 100,
-            )}
+            value={Math.round(filters.minDetectionConfidence * 100)}
             onChange={(event) =>
               setFilters({
-                minDetectionConfidence:
-                  Number(event.target.value) / 100,
+                minDetectionConfidence: Number(event.target.value) / 100,
               })
             }
             className="slider-track h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
@@ -189,13 +174,10 @@ export function FilterBar() {
             min="50"
             max="100"
             step="1"
-            value={Math.round(
-              filters.minSlickConfidence * 100,
-            )}
+            value={Math.round(filters.minSlickConfidence * 100)}
             onChange={(event) =>
               setFilters({
-                minSlickConfidence:
-                  Number(event.target.value) / 100,
+                minSlickConfidence: Number(event.target.value) / 100,
               })
             }
             className="slider-track slider-track-teal h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200"
@@ -222,9 +204,7 @@ export function FilterBar() {
 
           <div className="space-y-2">
             {SOURCE_OPTIONS.map((source) => {
-              const active = filters.sourceTypes.includes(
-                source.value,
-              );
+              const active = filters.sourceTypes.includes(source.value);
 
               return (
                 <button
@@ -253,15 +233,31 @@ export function FilterBar() {
 
                   <span
                     className={`h-2 w-2 rounded-full ${
-                      active
-                        ? "bg-emerald-500"
-                        : "bg-slate-300"
+                      active ? "bg-emerald-500" : "bg-slate-300"
                     }`}
                   />
                 </button>
               );
             })}
           </div>
+        </section>
+
+        {/* Source search */}
+        <section className="mb-6 border-t border-slate-200 pt-5">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="section-label">Find a source</h3>
+            <span className="text-[10px] text-slate-400">ID or factor</span>
+          </div>
+
+          <input
+            type="search"
+            value={filters.sourceSearch}
+            onChange={(event) =>
+              setFilters({ sourceSearch: event.target.value })
+            }
+            placeholder="Search vessel ID or evidence"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+          />
         </section>
 
         {/* Classes */}
@@ -275,9 +271,7 @@ export function FilterBar() {
 
           <div className="flex flex-wrap gap-2">
             {CLASS_OPTIONS.map((option) => {
-              const active = filters.classes.includes(
-                option.value,
-              );
+              const active = filters.classes.includes(option.value);
 
               return (
                 <button
@@ -312,9 +306,7 @@ export function FilterBar() {
               <button
                 key={value}
                 type="button"
-                onClick={() =>
-                  setFilters({ reviewStatus: value })
-                }
+                onClick={() => setFilters({ reviewStatus: value })}
                 className={`rounded-lg px-2 py-2 text-[10px] font-semibold transition ${
                   filters.reviewStatus === value
                     ? "bg-white text-slate-800 shadow-sm"

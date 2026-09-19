@@ -1,8 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   GeoJSON,
@@ -13,38 +9,26 @@ import {
   useMap,
 } from "react-leaflet";
 
-import {
-  useShallow,
-} from "zustand/react/shallow";
+import { useShallow } from "zustand/react/shallow";
 
-import {
-  useMapStore,
-} from "../../store/useMapStore";
+import { useMapStore } from "../../store/useMapStore";
 
-import {
-  AISLayer,
-} from "./AISLayer";
+import { AISLayer } from "./AISLayer";
 
-import {
-  DriftLayer,
-} from "./DriftLayer";
+import { DriftLayer } from "./DriftLayer";
 
-import {
-  SlickLayer,
-} from "./SlickLayer";
+import { SlickLayer } from "./SlickLayer";
 
 const BASE_LAYERS = {
   light: {
-    url:
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
 
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
 
   satellite: {
-    url:
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
 
     attribution:
       "Tiles &copy; Esri, Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
@@ -56,72 +40,39 @@ const DEMO_REGION_BOUNDS = [
   [36.37, 36.09],
 ];
 
-const DEMO_CENTER = [
-  33.2,
-  31.6,
-];
+const DEMO_CENTER = [33.2, 31.6];
 
 const COUNTRY_BOUNDARIES_URL =
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
 
-function getDatasetBounds(
-  slicks,
-) {
+function getDatasetBounds(slicks) {
   const points = [];
 
-  const collectCoordinates =
-    (coordinates) => {
-      if (
-        !Array.isArray(
-          coordinates,
-        )
-      ) {
-        return;
+  const collectCoordinates = (coordinates) => {
+    if (!Array.isArray(coordinates)) {
+      return;
+    }
+
+    if (
+      coordinates.length >= 2 &&
+      typeof coordinates[0] === "number" &&
+      typeof coordinates[1] === "number"
+    ) {
+      const [longitude, latitude] = coordinates;
+
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+        points.push([latitude, longitude]);
       }
 
-      if (
-        coordinates.length >=
-          2 &&
-        typeof coordinates[0] ===
-          "number" &&
-        typeof coordinates[1] ===
-          "number"
-      ) {
-        const [
-          longitude,
-          latitude,
-        ] = coordinates;
+      return;
+    }
 
-        if (
-          Number.isFinite(
-            latitude,
-          ) &&
-          Number.isFinite(
-            longitude,
-          )
-        ) {
-          points.push([
-            latitude,
-            longitude,
-          ]);
-        }
+    coordinates.forEach(collectCoordinates);
+  };
 
-        return;
-      }
-
-      coordinates.forEach(
-        collectCoordinates,
-      );
-    };
-
-  slicks.forEach(
-    (slick) => {
-      collectCoordinates(
-        slick?.polygon
-          ?.coordinates,
-      );
-    },
-  );
+  slicks.forEach((slick) => {
+    collectCoordinates(slick?.polygon?.coordinates);
+  });
 
   if (!points.length) {
     return null;
@@ -132,32 +83,15 @@ function getDatasetBounds(
   let minLon = Infinity;
   let maxLon = -Infinity;
 
-  points.forEach(
-    ([
-      latitude,
-      longitude,
-    ]) => {
-      minLat = Math.min(
-        minLat,
-        latitude,
-      );
+  points.forEach(([latitude, longitude]) => {
+    minLat = Math.min(minLat, latitude);
 
-      maxLat = Math.max(
-        maxLat,
-        latitude,
-      );
+    maxLat = Math.max(maxLat, latitude);
 
-      minLon = Math.min(
-        minLon,
-        longitude,
-      );
+    minLon = Math.min(minLon, longitude);
 
-      maxLon = Math.max(
-        maxLon,
-        longitude,
-      );
-    },
-  );
+    maxLon = Math.max(maxLon, longitude);
+  });
 
   return [
     [minLat, minLon],
@@ -165,9 +99,7 @@ function getDatasetBounds(
   ];
 }
 
-function DatasetViewport({
-  bounds,
-}) {
+function DatasetViewport({ bounds }) {
   const map = useMap();
 
   useEffect(() => {
@@ -175,69 +107,40 @@ function DatasetViewport({
       return;
     }
 
-    map.fitBounds(
-      bounds,
-      {
-        padding: [
-          55,
-          55,
-        ],
+    map.fitBounds(bounds, {
+      padding: [55, 55],
 
-        maxZoom: 11,
+      maxZoom: 11,
 
-        animate: false,
-      },
-    );
-  }, [
-    bounds,
-    map,
-  ]);
+      animate: false,
+    });
+  }, [bounds, map]);
 
   return null;
 }
 
 function CountryBoundaries() {
-  const [
-    countries,
-    setCountries,
-  ] = useState(null);
+  const [countries, setCountries] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    fetch(
-      COUNTRY_BOUNDARIES_URL,
-    )
-      .then(
-        (response) => {
-          if (
-            !response.ok
-          ) {
-            throw new Error(
-              "Could not load country boundaries.",
-            );
-          }
+    fetch(COUNTRY_BOUNDARIES_URL)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Could not load country boundaries.");
+        }
 
-          return response.json();
-        },
-      )
-      .then(
-        (data) => {
-          if (!cancelled) {
-            setCountries(
-              data,
-            );
-          }
-        },
-      )
-      .catch(
-        (error) => {
-          console.warn(
-            "Country boundary layer unavailable:",
-            error.message,
-          );
-        },
-      );
+        return response.json();
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setCountries(data);
+        }
+      })
+      .catch((error) => {
+        console.warn("Country boundary layer unavailable:", error.message);
+      });
 
     return () => {
       cancelled = true;
@@ -252,8 +155,7 @@ function CountryBoundaries() {
     <GeoJSON
       data={countries}
       style={{
-        color:
-          "#6d8f92",
+        color: "#6d8f92",
 
         weight: 0.8,
 
@@ -261,33 +163,20 @@ function CountryBoundaries() {
 
         fillOpacity: 0,
       }}
-      onEachFeature={(
-        feature,
-        layer,
-      ) => {
+      onEachFeature={(feature, layer) => {
         const countryName =
-          feature?.properties
-            ?.NAME ||
-          feature?.properties
-            ?.ADMIN ||
-          feature?.properties
-            ?.name;
+          feature?.properties?.NAME ||
+          feature?.properties?.ADMIN ||
+          feature?.properties?.name;
 
-        if (
-          countryName
-        ) {
-          layer.bindTooltip(
-            countryName,
-            {
-              sticky: true,
+        if (countryName) {
+          layer.bindTooltip(countryName, {
+            sticky: true,
 
-              direction:
-                "center",
+            direction: "center",
 
-              className:
-                "country-tooltip",
-            },
-          );
+            className: "country-tooltip",
+          });
         }
       }}
     />
@@ -297,93 +186,48 @@ function CountryBoundaries() {
 function CursorPositionTracker() {
   const map = useMap();
 
-  const setCursorPosition =
-    useMapStore(
-      (state) =>
-        state.setCursorPosition,
-    );
+  const setCursorPosition = useMapStore((state) => state.setCursorPosition);
 
-  const setMapZoom =
-    useMapStore(
-      (state) =>
-        state.setMapZoom,
-    );
+  const setMapZoom = useMapStore((state) => state.setMapZoom);
 
   useEffect(() => {
-    const handleMouseMove =
-      ({ latlng }) => {
-        setCursorPosition({
-          latitude:
-            latlng.lat,
+    const handleMouseMove = ({ latlng }) => {
+      setCursorPosition({
+        latitude: latlng.lat,
 
-          longitude:
-            latlng.lng,
-        });
-      };
+        longitude: latlng.lng,
+      });
+    };
 
-    const handleMouseOut =
-      () => {
-        setCursorPosition(
-          null,
-        );
-      };
+    const handleMouseOut = () => {
+      setCursorPosition(null);
+    };
 
-    const handleZoomEnd =
-      () => {
-        setMapZoom(
-          map.getZoom(),
-        );
-      };
+    const handleZoomEnd = () => {
+      setMapZoom(map.getZoom());
+    };
 
-    map.on(
-      "mousemove",
-      handleMouseMove,
-    );
+    map.on("mousemove", handleMouseMove);
 
-    map.on(
-      "mouseout",
-      handleMouseOut,
-    );
+    map.on("mouseout", handleMouseOut);
 
-    map.on(
-      "zoomend",
-      handleZoomEnd,
-    );
+    map.on("zoomend", handleZoomEnd);
 
     handleZoomEnd();
 
     return () => {
-      map.off(
-        "mousemove",
-        handleMouseMove,
-      );
+      map.off("mousemove", handleMouseMove);
 
-      map.off(
-        "mouseout",
-        handleMouseOut,
-      );
+      map.off("mouseout", handleMouseOut);
 
-      map.off(
-        "zoomend",
-        handleZoomEnd,
-      );
+      map.off("zoomend", handleZoomEnd);
     };
-  }, [
-    map,
-    setCursorPosition,
-    setMapZoom,
-  ]);
+  }, [map, setCursorPosition, setMapZoom]);
 
   return null;
 }
 
-function ToolButton({
-  label,
-  title,
-  onClick,
-  children,
-  active = false,
-}) {
+function ToolButton({ label, title, onClick, children, active = false }) {
   return (
     <button
       type="button"
@@ -401,47 +245,32 @@ function ToolButton({
   );
 }
 
-function LayerToggle({
-  label,
-  description,
-  enabled,
-  onChange,
-  icon,
-}) {
+function LayerToggle({ label, description, enabled, onChange, icon }) {
   const iconClass =
-    icon ===
-    "slick"
+    icon === "slick"
       ? "bg-orange-50 text-orange-600"
-      : icon ===
-          "ais"
+      : icon === "ais"
         ? "bg-blue-50 text-blue-600"
         : "bg-teal-50 text-teal-600";
 
   return (
     <button
       type="button"
-      onClick={() =>
-        onChange(
-          !enabled,
-        )
-      }
+      onClick={() => onChange(!enabled)}
       className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-slate-50"
     >
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${iconClass}`}
       >
-        {icon ===
-          "slick" && (
+        {icon === "slick" && (
           <span className="h-3 w-4 rounded-sm border-2 border-current" />
         )}
 
-        {icon ===
-          "ais" && (
+        {icon === "ais" && (
           <span className="h-0.5 w-4 rounded-full bg-current" />
         )}
 
-        {icon ===
-          "drift" && (
+        {icon === "drift" && (
           <span className="h-4 w-4 rounded-full border border-current border-dashed" />
         )}
       </span>
@@ -458,16 +287,12 @@ function LayerToggle({
 
       <span
         className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-          enabled
-            ? "bg-teal-500"
-            : "bg-slate-300"
+          enabled ? "bg-teal-500" : "bg-slate-300"
         }`}
       >
         <span
           className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-            enabled
-              ? "left-[18px]"
-              : "left-0.5"
+            enabled ? "left-[18px]" : "left-0.5"
           }`}
         />
       </span>
@@ -475,337 +300,184 @@ function LayerToggle({
   );
 }
 
-function MapToolbar({
-  activeBase,
-  setActiveBase,
-  resetBounds,
-}) {
+function MapToolbar({ activeBase, setActiveBase, resetBounds }) {
   const map = useMap();
 
-  const [
-    isFullscreen,
-    setIsFullscreen,
-  ] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const [
-    userLocation,
-    setUserLocation,
-  ] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
 
-  const [
-    searchQuery,
-    setSearchQuery,
-  ] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [
-    searchLocation,
-    setSearchLocation,
-  ] = useState(null);
+  const [searchLocation, setSearchLocation] = useState(null);
 
-  const [
-    searchError,
-    setSearchError,
-  ] = useState("");
+  const [searchError, setSearchError] = useState("");
 
-  const [
-    layersOpen,
-    setLayersOpen,
-  ] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
 
-  const layerToggles =
-    useMapStore(
-      (state) =>
-        state.layerToggles,
-    );
+  const layerToggles = useMapStore((state) => state.layerToggles);
 
-  const setLayerToggle =
-    useMapStore(
-      (state) =>
-        state.setLayerToggle,
-    );
+  const setLayerToggle = useMapStore((state) => state.setLayerToggle);
 
   useEffect(() => {
-    const handleFullscreenChange =
-      () => {
-        setIsFullscreen(
-          Boolean(
-            document.fullscreenElement,
-          ),
-        );
-      };
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
 
-    document.addEventListener(
-      "fullscreenchange",
-      handleFullscreenChange,
-    );
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
 
     return () =>
-      document.removeEventListener(
-        "fullscreenchange",
-        handleFullscreenChange,
-      );
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
-  const toggleFullscreen =
-    async () => {
-      const mapElement =
-        map.getContainer();
+  const toggleFullscreen = async () => {
+    const mapElement = map.getContainer();
 
-      try {
-        if (
-          !document.fullscreenElement
-        ) {
-          if (
-            mapElement.requestFullscreen
-          ) {
-            await mapElement.requestFullscreen();
-          }
-
-          return;
+    try {
+      if (!document.fullscreenElement) {
+        if (mapElement.requestFullscreen) {
+          await mapElement.requestFullscreen();
         }
-
-        if (
-          document.exitFullscreen
-        ) {
-          await document.exitFullscreen();
-        }
-      } catch (error) {
-        console.error(
-          "Fullscreen toggle failed:",
-          error,
-        );
-      }
-    };
-
-  const findMyLocation =
-    () => {
-      if (
-        !navigator.geolocation
-      ) {
-        console.warn(
-          "Geolocation is not supported by this browser.",
-        );
 
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(
-        ({ coords }) => {
-          const nextLocation =
-            [
-              coords.latitude,
-              coords.longitude,
-            ];
-
-          setUserLocation(
-            nextLocation,
-          );
-
-          map.flyTo(
-            nextLocation,
-            12,
-            {
-              duration: 1.5,
-            },
-          );
-        },
-
-        (error) => {
-          console.error(
-            "Geolocation failed:",
-            error.message,
-          );
-        },
-
-        {
-          enableHighAccuracy:
-            true,
-
-          timeout: 10000,
-        },
-      );
-    };
-
-  const searchLocationOnMap =
-    async (event) => {
-      event.preventDefault();
-
-      const query =
-        searchQuery.trim();
-
-      if (!query) {
-        return;
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
       }
+    } catch (error) {
+      console.error("Fullscreen toggle failed:", error);
+    }
+  };
 
-      const coordinateParts =
-        query
-          .split(",")
-          .map(
-            (part) =>
-              Number(
-                part.trim(),
-              ),
-          );
+  const findMyLocation = () => {
+    if (!navigator.geolocation) {
+      console.warn("Geolocation is not supported by this browser.");
 
-      const isCoordinateSearch =
-        coordinateParts.length ===
-          2 &&
-        coordinateParts.every(
-          Number.isFinite,
-        );
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const nextLocation = [coords.latitude, coords.longitude];
+
+        setUserLocation(nextLocation);
+
+        map.flyTo(nextLocation, 12, {
+          duration: 1.5,
+        });
+      },
+
+      (error) => {
+        console.error("Geolocation failed:", error.message);
+      },
+
+      {
+        enableHighAccuracy: true,
+
+        timeout: 10000,
+      },
+    );
+  };
+
+  const searchLocationOnMap = async (event) => {
+    event.preventDefault();
+
+    const query = searchQuery.trim();
+
+    if (!query) {
+      return;
+    }
+
+    const coordinateParts = query.split(",").map((part) => Number(part.trim()));
+
+    const isCoordinateSearch =
+      coordinateParts.length === 2 && coordinateParts.every(Number.isFinite);
+
+    if (isCoordinateSearch) {
+      const [latitude, longitude] = coordinateParts;
 
       if (
-        isCoordinateSearch
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180
       ) {
-        const [
-          latitude,
-          longitude,
-        ] =
-          coordinateParts;
-
-        if (
-          latitude <
-            -90 ||
-          latitude > 90 ||
-          longitude <
-            -180 ||
-          longitude > 180
-        ) {
-          setSearchError(
-            "Coordinates are outside the valid range.",
-          );
-
-          return;
-        }
-
-        const nextLocation =
-          [
-            latitude,
-            longitude,
-          ];
-
-        setSearchLocation(
-          nextLocation,
-        );
-
-        setSearchError(
-          "",
-        );
-
-        map.flyTo(
-          nextLocation,
-          11,
-          {
-            duration: 1.5,
-          },
-        );
+        setSearchError("Coordinates are outside the valid range.");
 
         return;
       }
 
-      try {
-        setSearchError(
-          "",
-        );
+      const nextLocation = [latitude, longitude];
 
-        const response =
-          await fetch(
-            `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(
-              query,
-            )}`,
-            {
-              headers: {
-                Accept:
-                  "application/json",
-              },
-            },
-          );
+      setSearchLocation(nextLocation);
 
-        if (!response.ok) {
-          throw new Error(
-            "Search request failed",
-          );
-        }
+      setSearchError("");
 
-        const results =
-          await response.json();
+      map.flyTo(nextLocation, 11, {
+        duration: 1.5,
+      });
 
-        if (
-          !results.length
-        ) {
-          setSearchError(
-            "Location not found.",
-          );
+      return;
+    }
 
-          return;
-        }
+    try {
+      setSearchError("");
 
-        const nextLocation =
-          [
-            Number(
-              results[0].lat,
-            ),
-            Number(
-              results[0].lon,
-            ),
-          ];
-
-        setSearchLocation(
-          nextLocation,
-        );
-
-        map.flyTo(
-          nextLocation,
-          11,
-          {
-            duration: 1.5,
-          },
-        );
-      } catch (error) {
-        console.error(
-          "Location search failed:",
-          error,
-        );
-
-        setSearchError(
-          "Search is unavailable right now.",
-        );
-      }
-    };
-
-  const resetToDatasetRegion =
-    () => {
-      setUserLocation(
-        null,
-      );
-
-      setSearchLocation(
-        null,
-      );
-
-      setSearchQuery(
-        "",
-      );
-
-      setSearchError(
-        "",
-      );
-
-      map.fitBounds(
-        resetBounds ??
-          DEMO_REGION_BOUNDS,
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(
+          query,
+        )}`,
         {
-          padding: [
-            55,
-            55,
-          ],
-
-          maxZoom: 10,
-
-          animate: true,
+          headers: {
+            Accept: "application/json",
+          },
         },
       );
-    };
+
+      if (!response.ok) {
+        throw new Error("Search request failed");
+      }
+
+      const results = await response.json();
+
+      if (!results.length) {
+        setSearchError("Location not found.");
+
+        return;
+      }
+
+      const nextLocation = [Number(results[0].lat), Number(results[0].lon)];
+
+      setSearchLocation(nextLocation);
+
+      map.flyTo(nextLocation, 11, {
+        duration: 1.5,
+      });
+    } catch (error) {
+      console.error("Location search failed:", error);
+
+      setSearchError("Search is unavailable right now.");
+    }
+  };
+
+  const resetToDatasetRegion = () => {
+    setUserLocation(null);
+
+    setSearchLocation(null);
+
+    setSearchQuery("");
+
+    setSearchError("");
+
+    map.fitBounds(resetBounds ?? DEMO_REGION_BOUNDS, {
+      padding: [55, 55],
+
+      maxZoom: 10,
+
+      animate: true,
+    });
+  };
 
   return (
     <>
@@ -814,9 +486,7 @@ function MapToolbar({
         {/* Search is deliberately separated from the stats row */}
         <div className="pointer-events-auto mr-[58px]">
           <form
-            onSubmit={
-              searchLocationOnMap
-            }
+            onSubmit={searchLocationOnMap}
             className="relative flex h-11 w-[280px] items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3.5 shadow-[0_10px_30px_rgba(15,23,42,0.32)]"
           >
             <svg
@@ -827,31 +497,18 @@ function MapToolbar({
               strokeWidth="2"
               aria-hidden="true"
             >
-              <circle
-                cx="11"
-                cy="11"
-                r="5.5"
-              />
+              <circle cx="11" cy="11" r="5.5" />
 
               <path d="M16 16L21 21" />
             </svg>
 
             <input
               type="text"
-              value={
-                searchQuery
-              }
-              onChange={(
-                event,
-              ) => {
-                setSearchQuery(
-                  event.target
-                    .value,
-                );
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
 
-                setSearchError(
-                  "",
-                );
+                setSearchError("");
               }}
               placeholder="Search location or lat, lon"
               className="w-full border-0 bg-transparent text-[13px] font-medium text-white outline-none placeholder:text-slate-400"
@@ -859,9 +516,7 @@ function MapToolbar({
 
             {searchError && (
               <span className="absolute right-0 top-12 whitespace-nowrap rounded-lg border border-red-400/30 bg-slate-950 px-3 py-2 text-[11px] text-red-300 shadow-lg">
-                {
-                  searchError
-                }
+                {searchError}
               </span>
             )}
           </form>
@@ -872,17 +527,8 @@ function MapToolbar({
           <div className="relative">
             <ToolButton
               label="Map layers"
-              active={
-                layersOpen
-              }
-              onClick={() =>
-                setLayersOpen(
-                  (
-                    open,
-                  ) =>
-                    !open,
-                )
-              }
+              active={layersOpen}
+              onClick={() => setLayersOpen((open) => !open)}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -916,51 +562,24 @@ function MapToolbar({
                   <LayerToggle
                     label="Slick detections"
                     description="Detected surface anomalies"
-                    enabled={
-                      layerToggles.slicks
-                    }
-                    onChange={(
-                      value,
-                    ) =>
-                      setLayerToggle(
-                        "slicks",
-                        value,
-                      )
-                    }
+                    enabled={layerToggles.slicks}
+                    onChange={(value) => setLayerToggle("slicks", value)}
                     icon="slick"
                   />
 
                   <LayerToggle
                     label="AIS tracks"
                     description="Vessel movement history"
-                    enabled={
-                      layerToggles.ais
-                    }
-                    onChange={(
-                      value,
-                    ) =>
-                      setLayerToggle(
-                        "ais",
-                        value,
-                      )
-                    }
+                    enabled={layerToggles.ais}
+                    onChange={(value) => setLayerToggle("ais", value)}
                     icon="ais"
                   />
 
                   <LayerToggle
                     label="Drift analysis"
                     description="Hindcast and forecast"
-                    enabled={
-                      layerToggles.driftCone
-                    }
-                    onChange={(
-                      value,
-                    ) =>
-                      setLayerToggle(
-                        "driftCone",
-                        value,
-                      )
-                    }
+                    enabled={layerToggles.driftCone}
+                    onChange={(value) => setLayerToggle("driftCone", value)}
                     icon="drift"
                   />
                 </div>
@@ -973,14 +592,9 @@ function MapToolbar({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        setActiveBase(
-                          "light",
-                        )
-                      }
+                      onClick={() => setActiveBase("light")}
                       className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                        activeBase ===
-                        "light"
+                        activeBase === "light"
                           ? "border-teal-500 bg-teal-50 text-teal-700"
                           : "border-slate-200 text-slate-500 hover:bg-slate-50"
                       }`}
@@ -990,14 +604,9 @@ function MapToolbar({
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setActiveBase(
-                          "satellite",
-                        )
-                      }
+                      onClick={() => setActiveBase("satellite")}
                       className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                        activeBase ===
-                        "satellite"
+                        activeBase === "satellite"
                           ? "border-teal-500 bg-teal-50 text-teal-700"
                           : "border-slate-200 text-slate-500 hover:bg-slate-50"
                       }`}
@@ -1011,14 +620,8 @@ function MapToolbar({
           </div>
 
           <ToolButton
-            label={
-              isFullscreen
-                ? "Exit fullscreen"
-                : "Enter fullscreen"
-            }
-            onClick={
-              toggleFullscreen
-            }
+            label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            onClick={toggleFullscreen}
           >
             <svg
               viewBox="0 0 24 24"
@@ -1048,12 +651,7 @@ function MapToolbar({
             </svg>
           </ToolButton>
 
-          <ToolButton
-            label="Find my location"
-            onClick={
-              findMyLocation
-            }
-          >
+          <ToolButton label="Find my location" onClick={findMyLocation}>
             <svg
               viewBox="0 0 24 24"
               className="h-5 w-5"
@@ -1064,30 +662,20 @@ function MapToolbar({
               strokeLinejoin="round"
               aria-hidden="true"
             >
-              <circle
-                cx="12"
-                cy="12"
-                r="3.5"
-              />
+              <circle cx="12" cy="12" r="3.5" />
 
               <path d="M12 2.5v3" />
               <path d="M12 18.5v3" />
               <path d="M2.5 12h3" />
               <path d="M18.5 12h3" />
 
-              <circle
-                cx="12"
-                cy="12"
-                r="8"
-              />
+              <circle cx="12" cy="12" r="8" />
             </svg>
           </ToolButton>
 
           <ToolButton
             label="Reset to dataset region"
-            onClick={
-              resetToDatasetRegion
-            }
+            onClick={resetToDatasetRegion}
           >
             <svg
               viewBox="0 0 24 24"
@@ -1130,25 +718,14 @@ function MapToolbar({
       </div>
 
       {userLocation && (
-        <Marker
-          position={
-            userLocation
-          }
-        >
+        <Marker position={userLocation}>
           <Popup>
             <div className="flex items-center gap-3">
-              <span>
-                Your current
-                location
-              </span>
+              <span>Your current location</span>
 
               <button
                 type="button"
-                onClick={() =>
-                  setUserLocation(
-                    null,
-                  )
-                }
+                onClick={() => setUserLocation(null)}
                 className="font-semibold text-slate-600 hover:text-slate-900"
               >
                 Close
@@ -1159,27 +736,14 @@ function MapToolbar({
       )}
 
       {searchLocation && (
-        <Marker
-          position={
-            searchLocation
-          }
-        >
+        <Marker position={searchLocation}>
           <Popup>
             <div className="flex items-center gap-3">
-              <span>
-                Search result:{" "}
-                {
-                  searchQuery
-                }
-              </span>
+              <span>Search result: {searchQuery}</span>
 
               <button
                 type="button"
-                onClick={() =>
-                  setSearchLocation(
-                    null,
-                  )
-                }
+                onClick={() => setSearchLocation(null)}
                 className="font-semibold text-slate-600 hover:text-slate-900"
               >
                 Close
@@ -1192,49 +756,60 @@ function MapToolbar({
   );
 }
 
-export function MapShell() {
-  const allSlicks =
-    useMapStore(
-      (state) =>
-        state.slicks,
-    );
+function MapLegend() {
+  const items = [
+    ["Slick detection", "bg-orange-500", "polygon"],
+    ["AIS track", "bg-blue-500", "line"],
+    ["Drift forecast", "border-teal-500", "ring"],
+  ];
 
-  const filteredSlicks =
-    useMapStore(
-      useShallow(
-        (state) =>
-          state.getFilteredSlicks(),
-      ),
-    );
+  return (
+    <div className="pointer-events-none absolute bottom-[52px] right-4 z-[700] hidden rounded-xl border border-white/80 bg-white/90 px-3 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.18)] backdrop-blur-sm sm:block">
+      <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
+        Map legend
+      </p>
 
-  const datasetBounds =
-    useMemo(
-      () =>
-        getDatasetBounds(
-          allSlicks,
-        ),
-      [allSlicks],
-    );
+      <div className="space-y-1.5">
+        {items.map(([label, color, shape]) => (
+          <div
+            key={label}
+            className="flex items-center gap-2 text-[10px] font-medium text-slate-600"
+          >
+            <span
+              className={`h-2.5 w-2.5 shrink-0 ${color} ${
+                shape === "polygon"
+                  ? "rounded-sm"
+                  : shape === "line"
+                    ? "h-0.5 w-4 rounded-full"
+                    : "rounded-full border bg-transparent"
+              }`}
+            />
 
-  const layerToggles =
-    useMapStore(
-      (state) =>
-        state.layerToggles,
-    );
-
-  const [
-    activeBase,
-    setActiveBase,
-  ] = useState(
-    "light",
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
+}
+
+export function MapShell() {
+  const allSlicks = useMapStore((state) => state.slicks);
+
+  const filteredSlicks = useMapStore(
+    useShallow((state) => state.getFilteredSlicks()),
+  );
+
+  const datasetBounds = useMemo(() => getDatasetBounds(allSlicks), [allSlicks]);
+
+  const layerToggles = useMapStore((state) => state.layerToggles);
+
+  const [activeBase, setActiveBase] = useState("light");
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-950">
       <MapContainer
-        center={
-          DEMO_CENTER
-        }
+        center={DEMO_CENTER}
         zoom={9}
         maxZoom={15}
         minZoom={6}
@@ -1246,25 +821,13 @@ export function MapShell() {
         keyboard
         className="h-full w-full"
       >
-        <DatasetViewport
-          bounds={
-            datasetBounds
-          }
-        />
+        <DatasetViewport bounds={datasetBounds} />
 
         <CursorPositionTracker />
 
         <TileLayer
-          attribution={
-            BASE_LAYERS[
-              activeBase
-            ].attribution
-          }
-          url={
-            BASE_LAYERS[
-              activeBase
-            ].url
-          }
+          attribution={BASE_LAYERS[activeBase].attribution}
+          url={BASE_LAYERS[activeBase].url}
           opacity={1}
           maxNativeZoom={19}
           maxZoom={19}
@@ -1272,34 +835,20 @@ export function MapShell() {
 
         <CountryBoundaries />
 
-        {layerToggles.driftCone && (
-          <DriftLayer />
-        )}
+        {layerToggles.driftCone && <DriftLayer />}
 
-        {layerToggles.ais && (
-          <AISLayer />
-        )}
+        {layerToggles.ais && <AISLayer />}
 
-        {layerToggles.slicks && (
-          <SlickLayer
-            slicks={
-              filteredSlicks
-            }
-          />
-        )}
+        {layerToggles.slicks && <SlickLayer slicks={filteredSlicks} />}
 
         <MapToolbar
-          activeBase={
-            activeBase
-          }
-          setActiveBase={
-            setActiveBase
-          }
-          resetBounds={
-            datasetBounds
-          }
+          activeBase={activeBase}
+          setActiveBase={setActiveBase}
+          resetBounds={datasetBounds}
         />
       </MapContainer>
+
+      <MapLegend />
     </div>
   );
 }
