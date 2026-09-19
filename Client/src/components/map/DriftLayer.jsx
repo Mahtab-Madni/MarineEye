@@ -1,12 +1,42 @@
-import { Circle, CircleMarker, Polyline, Tooltip } from "react-leaflet";
+import {
+  Circle,
+  CircleMarker,
+  Polyline,
+  Tooltip,
+  useMap,
+} from "react-leaflet";
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { useMapStore } from "../../store/useMapStore";
 
 const DEFAULT_RADIUS_KM = 5;
 
-const toNumber = (value, fallback = 0) => {
+const COLORS = {
+  hindcast: "#6f9dad",
+  observation: "#e1a743",
+
+  forecastRed: "#ef4444",
+  forecastGreen: "#22c55e",
+  forecastBlue: "#2563eb",
+
+  path: "#506c72",
+};
+
+const toNumber = (
+  value,
+  fallback = 0,
+) => {
   const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
+
+  return Number.isFinite(number)
+    ? number
+    : fallback;
 };
 
 const getOffset = (step) =>
@@ -22,47 +52,75 @@ const getRadiusKm = (step) =>
   Math.max(
     0,
     toNumber(
-      step?.radius_km ?? step?.radius ?? step?.uncertainty_radius_km,
+      step?.radius_km ??
+        step?.radius ??
+        step?.uncertainty_radius_km,
       DEFAULT_RADIUS_KM,
     ),
   );
 
 /*
- * MarineEye keeps GeoJSON coordinates as:
- *
+ * Data:
  * [longitude, latitude]
  *
- * Leaflet expects:
- *
+ * Leaflet:
  * [latitude, longitude]
  */
-const getCenter = (step, fallback = null) => {
+const getCenter = (
+  step,
+  fallback = null,
+) => {
   if (!step) {
     return fallback;
   }
 
-  if (Array.isArray(step.center) && step.center.length >= 2) {
-    const longitude = Number(step.center[0]);
+  if (
+    Array.isArray(step.center) &&
+    step.center.length >= 2
+  ) {
+    const longitude =
+      Number(step.center[0]);
 
-    const latitude = Number(step.center[1]);
+    const latitude =
+      Number(step.center[1]);
 
-    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      return [latitude, longitude];
+    if (
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude)
+    ) {
+      return [
+        latitude,
+        longitude,
+      ];
     }
   }
 
-  if (Array.isArray(step.position) && step.position.length >= 2) {
-    const longitude = Number(step.position[0]);
+  if (
+    Array.isArray(step.position) &&
+    step.position.length >= 2
+  ) {
+    const longitude =
+      Number(step.position[0]);
 
-    const latitude = Number(step.position[1]);
+    const latitude =
+      Number(step.position[1]);
 
-    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      return [latitude, longitude];
+    if (
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude)
+    ) {
+      return [
+        latitude,
+        longitude,
+      ];
     }
   }
 
   const latitude = Number(
-    step.latitude ?? step.lat ?? step.center_lat ?? step.lat_center,
+    step.latitude ??
+      step.lat ??
+      step.center_lat ??
+      step.lat_center,
   );
 
   const longitude = Number(
@@ -73,120 +131,195 @@ const getCenter = (step, fallback = null) => {
       step.lon_center,
   );
 
-  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-    return [latitude, longitude];
+  if (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude)
+  ) {
+    return [
+      latitude,
+      longitude,
+    ];
   }
 
   return fallback;
 };
 
-const getPhase = (step, offset) => {
-  const explicitPhase = String(step?.phase ?? "").toLowerCase();
-
-  if (explicitPhase.includes("forecast")) {
-    return "Forecast";
-  }
-
-  if (explicitPhase.includes("hindcast")) {
-    return "Hindcast";
-  }
-
-  if (
-    explicitPhase.includes("observation") ||
-    explicitPhase.includes("current")
-  ) {
-    return "Observation";
-  }
-
-  if (offset < 0) {
-    return "Hindcast";
-  }
-
-  if (offset > 0) {
-    return "Forecast";
-  }
-
-  return "Observation";
-};
-
-const getPolygonCenter = (slick) => {
-  const coordinates = slick?.polygon?.coordinates?.[0];
+const getPolygonCenter = (
+  slick,
+) => {
+  const coordinates =
+    slick?.polygon?.coordinates?.[0];
 
   if (!Array.isArray(coordinates)) {
     return null;
   }
 
-  const points = coordinates.filter(
-    (point) =>
-      Array.isArray(point) &&
-      point.length >= 2 &&
-      Number.isFinite(Number(point[0])) &&
-      Number.isFinite(Number(point[1])),
-  );
+  const points =
+    coordinates.filter(
+      (point) =>
+        Array.isArray(point) &&
+        point.length >= 2 &&
+        Number.isFinite(
+          Number(point[0]),
+        ) &&
+        Number.isFinite(
+          Number(point[1]),
+        ),
+    );
 
   if (!points.length) {
     return null;
   }
 
+  const longitude =
+    points.reduce(
+      (sum, point) =>
+        sum + Number(point[0]),
+      0,
+    ) / points.length;
+
+  const latitude =
+    points.reduce(
+      (sum, point) =>
+        sum + Number(point[1]),
+      0,
+    ) / points.length;
+
   return [
-    points.reduce((sum, point) => sum + Number(point[0]), 0) / points.length,
-    points.reduce((sum, point) => sum + Number(point[1]), 0) / points.length,
+    latitude,
+    longitude,
   ];
 };
 
-const normalizeSteps = (slick) => {
-  const hindcast = Array.isArray(slick?.drift?.hindcast)
-    ? slick.drift.hindcast
-    : [];
+/*
+ * IMPORTANT:
+ *
+ * The old code had:
+ *
+ * observationStep ? [observationStep] : []
+ *
+ * which creates:
+ *
+ * [..., [observationStep], ...]
+ *
+ * That is wrong.
+ *
+ * This implementation puts the observation
+ * object directly into the timeline.
+ */
+const normalizeSteps = (
+  slick,
+) => {
+  const hindcast =
+    Array.isArray(
+      slick?.drift?.hindcast,
+    )
+      ? slick.drift.hindcast
+      : [];
 
-  const forecast = Array.isArray(slick?.drift?.forecast)
-    ? slick.drift.forecast
-    : [];
+  const forecast =
+    Array.isArray(
+      slick?.drift?.forecast,
+    )
+      ? slick.drift.forecast
+      : [];
 
-  const observation =
-    slick?.drift?.observation ?? slick?.drift?.current ?? null;
+  const explicitObservation =
+    slick?.drift?.observation ??
+    slick?.drift?.current ??
+    null;
 
-  const observationCenter = getPolygonCenter(slick);
+  const polygonCenter =
+    getPolygonCenter(slick);
 
-  const observationStep = observation ?? {
-    t_offset_hours: 0,
+  /*
+   * The existing generator stores 0H
+   * as the final hindcast record.
+   *
+   * Preserve it as observation.
+   */
+  const generatedZeroHour =
+    hindcast.find(
+      (step) =>
+        getOffset(step) === 0,
+    ) ?? null;
+
+  const observationStep =
+    explicitObservation ??
+    generatedZeroHour ?? {
+      t_offset_hours: 0,
+      phase: "Observation",
+      ...(polygonCenter
+        ? {
+            center: [
+              polygonCenter[1],
+              polygonCenter[0],
+            ],
+          }
+        : {}),
+    };
+
+  const negativeHindcast =
+    hindcast
+      .filter(
+        (step) =>
+          getOffset(step) < 0,
+      )
+      .map((step) => ({
+        ...step,
+        offset: getOffset(step),
+        phase: "Hindcast",
+      }));
+
+  const observation = {
+    ...observationStep,
+    offset: 0,
     phase: "Observation",
-    ...(observationCenter ? { center: observationCenter } : {}),
   };
 
-  const rawSteps = [
-    ...hindcast,
-    observationStep ? [observationStep] : [],
-    ...forecast,
-  ];
-
-  const steps = rawSteps
-    .map((step) => {
-      const offset = getOffset(step);
-
-      return {
+  const positiveForecast =
+    forecast
+      .filter(
+        (step) =>
+          getOffset(step) > 0,
+      )
+      .map((step) => ({
         ...step,
-        offset,
-        phase: getPhase(step, offset),
-      };
-    })
-    .sort((a, b) => a.offset - b.offset);
+        offset: getOffset(step),
+        phase: "Forecast",
+      }));
 
-  const seenOffsets = new Set();
+  const combined = [
+    ...negativeHindcast,
+    observation,
+    ...positiveForecast,
+  ].sort(
+    (a, b) =>
+      a.offset - b.offset,
+  );
 
-  return steps.filter((step) => {
-    if (seenOffsets.has(step.offset)) {
-      return false;
-    }
+  const seen = new Set();
 
-    seenOffsets.add(step.offset);
+  return combined.filter(
+    (step) => {
+      if (
+        seen.has(step.offset)
+      ) {
+        return false;
+      }
 
-    return true;
-  });
+      seen.add(step.offset);
+
+      return true;
+    },
+  );
 };
 
-const formatOffset = (offset) => {
-  const value = toNumber(offset);
+const formatOffset = (
+  offset,
+) => {
+  const value =
+    toNumber(offset);
 
   if (value > 0) {
     return `+${value}H`;
@@ -199,104 +332,327 @@ const formatOffset = (offset) => {
   return "0H";
 };
 
-const getPhaseColor = (phase) => {
-  if (phase === "Forecast") {
-    return "#2fae9b";
+const getForecastColor = (
+  forecastSteps,
+  step,
+) => {
+  const index =
+    forecastSteps.findIndex(
+      (item) =>
+        item.offset ===
+        step.offset,
+    );
+
+  if (index === 0) {
+    return COLORS.forecastRed;
   }
 
-  if (phase === "Hindcast") {
-    return "#6f9dad";
+  if (index === 1) {
+    return COLORS.forecastGreen;
   }
 
-  return "#e1a743";
+  return COLORS.forecastBlue;
 };
 
+const getStepColor = (
+  step,
+  forecastSteps,
+) => {
+  if (
+    step.phase ===
+    "Forecast"
+  ) {
+    return getForecastColor(
+      forecastSteps,
+      step,
+    );
+  }
+
+  if (
+    step.phase ===
+    "Observation"
+  ) {
+    return COLORS.observation;
+  }
+
+  return COLORS.hindcast;
+};
+
+function MapClickHandler({
+  onMapClick,
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleClick = () => {
+      onMapClick();
+    };
+
+    map.on(
+      "click",
+      handleClick,
+    );
+
+    return () => {
+      map.off(
+        "click",
+        handleClick,
+      );
+    };
+  }, [
+    map,
+    onMapClick,
+  ]);
+
+  return null;
+}
+
 export function DriftLayer() {
-  const slicks = useMapStore((state) => state.slicks);
+  const slicks =
+    useMapStore(
+      (state) =>
+        state.slicks,
+    );
 
-  const selectedSlickId = useMapStore((state) => state.selectedSlickId);
+  const selectedSlickId =
+    useMapStore(
+      (state) =>
+        state.selectedSlickId,
+    );
 
-  const driftTimeOffset = useMapStore((state) => state.driftTimeOffset);
+  const driftTimeOffset =
+    useMapStore(
+      (state) =>
+        state.driftTimeOffset,
+    );
 
-  const selectedSlick = slicks.find((slick) => slick.id === selectedSlickId);
+  const selectedSlick =
+    slicks.find(
+      (slick) =>
+        String(slick.id) ===
+        String(
+          selectedSlickId,
+        ),
+    );
+
+  const [
+    circleVisible,
+    setCircleVisible,
+  ] = useState(false);
+
+  const previousOffsetRef =
+    useRef(0);
+
+  /*
+   * Selecting a different slick starts with
+   * no uncertainty circle.
+   */
+  useEffect(() => {
+    setCircleVisible(false);
+    previousOffsetRef.current = 0;
+  }, [selectedSlickId]);
+
+  /*
+   * A real timeline change automatically
+   * shows the circle for that selected hour.
+   *
+   * The ref prevents the initial 0H render,
+   * and the automatic 0H reset when selecting
+   * a new slick, from opening the circle.
+   */
+  useEffect(() => {
+    const nextOffset =
+      Number(driftTimeOffset);
+
+    if (
+      previousOffsetRef.current !==
+      nextOffset
+    ) {
+      setCircleVisible(true);
+    }
+
+    previousOffsetRef.current =
+      nextOffset;
+  }, [driftTimeOffset]);
+
+  const hideCircle =
+    useCallback(() => {
+      setCircleVisible(false);
+    }, []);
 
   if (!selectedSlick) {
     return null;
   }
 
-  const steps = normalizeSteps(selectedSlick);
+  const steps =
+    normalizeSteps(
+      selectedSlick,
+    );
 
   if (!steps.length) {
     return null;
   }
 
-  const observationStep = steps.find((step) => step.offset === 0) ?? steps[0];
+  const polygonCenter =
+    getPolygonCenter(
+      selectedSlick,
+    );
 
-  const observationCenter = getCenter(observationStep);
+  const observationStep =
+    steps.find(
+      (step) =>
+        step.offset === 0,
+    ) ?? steps[0];
+
+  const fallbackCenter =
+    getCenter(
+      steps.find(
+        (step) =>
+          getCenter(step) !==
+          null,
+      ),
+      polygonCenter,
+    ) ?? polygonCenter;
+
+  const observationCenter =
+    getCenter(
+      observationStep,
+      polygonCenter,
+    ) ?? fallbackCenter;
 
   if (!observationCenter) {
     return null;
   }
 
-  const requestedOffset = toNumber(driftTimeOffset);
+  const requestedOffset =
+    toNumber(
+      driftTimeOffset,
+    );
 
   const activeStep =
-    steps.find((step) => step.offset === requestedOffset) ??
-    steps.reduce((closest, step) => {
-      const currentDistance = Math.abs(step.offset - requestedOffset);
+    steps.find(
+      (step) =>
+        step.offset ===
+        requestedOffset,
+    ) ??
+    steps.reduce(
+      (closest, step) => {
+        const currentDistance =
+          Math.abs(
+            step.offset -
+              requestedOffset,
+          );
 
-      const closestDistance = Math.abs(closest.offset - requestedOffset);
+        const closestDistance =
+          Math.abs(
+            closest.offset -
+              requestedOffset,
+          );
 
-      return currentDistance < closestDistance ? step : closest;
-    }, steps[0]);
+        return currentDistance <
+          closestDistance
+          ? step
+          : closest;
+      },
+      steps[0],
+    );
 
-  const activeCenter = getCenter(activeStep, observationCenter);
+  const activeOffset =
+    activeStep.offset;
 
-  const activeOffset = activeStep.offset;
+  const forecastSteps =
+    steps.filter(
+      (step) =>
+        step.phase ===
+        "Forecast",
+    );
 
-  const activePhase = activeStep.phase;
+  const fullPath =
+    steps
+      .map((step) =>
+        getCenter(
+          step,
+          observationCenter,
+        ),
+      )
+      .filter(Boolean);
 
-  const activeRadiusKm = getRadiusKm(activeStep);
+  const selectedPath =
+    steps
+      .filter(
+        (step) =>
+          step.offset <=
+          activeOffset,
+      )
+      .map((step) =>
+        getCenter(
+          step,
+          observationCenter,
+        ),
+      )
+      .filter(Boolean);
 
-  /*
-   * Build the complete movement
-   * path.
-   */
-  const fullPath = steps
-    .map((step) => getCenter(step, observationCenter))
-    .filter(Boolean);
+  const forecastPath =
+    steps
+      .filter(
+        (step) =>
+          step.offset >= 0,
+      )
+      .map((step) =>
+        getCenter(
+          step,
+          observationCenter,
+        ),
+      )
+      .filter(Boolean);
 
-  /*
-   * Historical path ends at the
-   * currently selected time.
-   */
-  const selectedPath = steps
-    .filter((step) => step.offset <= activeOffset)
-    .map((step) => getCenter(step, observationCenter))
-    .filter(Boolean);
+  const circleCenter =
+    getCenter(
+      activeStep,
+      observationCenter,
+    );
 
-  /*
-   * Forecast path starts at the
-   * observation and continues
-   * forward.
-   */
-  const forecastPath = steps
-    .filter((step) => step.offset >= 0)
-    .map((step) => getCenter(step, observationCenter))
-    .filter(Boolean);
+  const circleColor =
+    getStepColor(
+      activeStep,
+      forecastSteps,
+    );
+
+  const circleRadius =
+    getRadiusKm(activeStep);
+
+  const handleDotClick = (
+    event,
+    offset,
+  ) => {
+    event?.originalEvent?.stopPropagation?.();
+    event?.stopPropagation?.();
+
+    useMapStore.setState({
+      driftTimeOffset:
+        Number(offset),
+    });
+
+    setCircleVisible(true);
+  };
 
   return (
     <>
-      {/* -------------------------------------------------
-          COMPLETE MOVEMENT ROUTE
-          ------------------------------------------------- */}
+      <MapClickHandler
+        onMapClick={
+          hideCircle
+        }
+      />
+
+      {/* Full movement path */}
       {fullPath.length >= 2 && (
         <Polyline
           positions={fullPath}
           pathOptions={{
-            color: "#506c72",
+            color:
+              COLORS.path,
             weight: 2,
-            opacity: 0.22,
+            opacity: 0.25,
             dashArray: "4 8",
             lineCap: "round",
             lineJoin: "round",
@@ -304,191 +660,178 @@ export function DriftLayer() {
         />
       )}
 
-      {/* -------------------------------------------------
-          HINDCAST / SELECTED TRAIL
-          ------------------------------------------------- */}
+      {/* Historical / selected path */}
       {selectedPath.length >= 2 && (
         <Polyline
-          positions={selectedPath}
+          positions={
+            selectedPath
+          }
           pathOptions={{
-            color: activeOffset < 0 ? "#6f9dad" : "#e1a743",
+            color:
+              getStepColor(
+                activeStep,
+                forecastSteps,
+              ),
             weight: 4,
             opacity: 0.72,
-            dashArray: activeOffset < 0 ? "7 7" : undefined,
+            dashArray:
+              activeOffset < 0
+                ? "7 7"
+                : undefined,
             lineCap: "round",
             lineJoin: "round",
           }}
         />
       )}
 
-      {/* -------------------------------------------------
-          FORECAST TRAIL
-          ------------------------------------------------- */}
+      {/* Forecast path */}
       {forecastPath.length >= 2 && (
         <Polyline
-          positions={forecastPath}
+          positions={
+            forecastPath
+          }
           pathOptions={{
-            color: "#2fae9b",
+            color:
+              COLORS.path,
             weight: 3,
-            opacity: 0.68,
-            dashArray: "6 7",
+            opacity: 0.42,
+            dashArray: "5 7",
             lineCap: "round",
             lineJoin: "round",
           }}
         />
       )}
 
-      {/* -------------------------------------------------
-          TIMELINE POINTS
-          Small points replace the previous stack of
-          overlapping uncertainty circles.
-          ------------------------------------------------- */}
-      {steps.map((step) => {
-        const center = getCenter(step, observationCenter);
+      {/* Every timeline point */}
+      {steps.map(
+        (step) => {
+          const center =
+            getCenter(
+              step,
+              observationCenter,
+            );
 
-        if (!center) {
-          return null;
-        }
+          if (!center) {
+            return null;
+          }
 
-        const isActive = step.offset === activeOffset;
+          const color =
+            getStepColor(
+              step,
+              forecastSteps,
+            );
 
-        const isObservation = step.offset === 0;
+          const active =
+            step.offset ===
+            activeOffset;
 
-        if (isActive || isObservation) {
-          return null;
-        }
+          return (
+            <CircleMarker
+              key={`drift-point-${selectedSlick.id}-${step.offset}`}
+              center={center}
+              radius={
+                active ? 7 : 5
+              }
+              pathOptions={{
+                color,
+                fillColor: color,
+                fillOpacity: 1,
+                weight:
+                  active
+                    ? 4
+                    : 2,
+              }}
+              eventHandlers={{
+                click: (
+                  event,
+                ) =>
+                  handleDotClick(
+                    event,
+                    step.offset,
+                  ),
+              }}
+            >
+              <Tooltip
+                direction="top"
+                offset={[0, -6]}
+                opacity={0.95}
+              >
+                <div className="text-[11px] font-semibold">
+                  {formatOffset(
+                    step.offset,
+                  )}
+                </div>
 
-        return (
-          <CircleMarker
-            key={`drift-step-${selectedSlick.id}-${step.offset}`}
-            center={center}
-            radius={4}
+                <div className="text-[10px]">
+                  {step.phase}
+                </div>
+
+                <div className="text-[10px]">
+                  Uncertainty:{" "}
+                  {circleRadiusForStep(
+                    step,
+                  ).toFixed(1)}{" "}
+                  km
+                </div>
+
+                <div className="mt-1 text-[9px] text-slate-500">
+                  Click to inspect
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          );
+        },
+      )}
+
+      {/* ONLY the selected hour's uncertainty circle */}
+      {circleVisible &&
+        circleCenter && (
+          <Circle
+            center={circleCenter}
+            radius={
+              circleRadius * 1000
+            }
             pathOptions={{
-              color: getPhaseColor(step.phase),
+              color:
+                circleColor,
               weight: 2,
-              fillColor: getPhaseColor(step.phase),
-              fillOpacity: 0.8,
-              opacity: 0.75,
+              opacity: 0.9,
+              fillColor:
+                circleColor,
+              fillOpacity: 0.08,
+              dashArray: "7 6",
             }}
           >
-            <Tooltip direction="top" offset={[0, -4]}>
-              <div className="text-xs">
-                <strong>{step.phase}</strong>
-                <br />
-                {formatOffset(step.offset)}
+            <Tooltip
+              direction="top"
+              offset={[0, -8]}
+            >
+              <div className="text-[11px] font-semibold">
+                {formatOffset(
+                  activeOffset,
+                )}
+              </div>
+
+              <div className="text-[10px]">
+                {activeStep.phase}
+              </div>
+
+              <div className="text-[10px]">
+                Uncertainty:{" "}
+                {circleRadius.toFixed(
+                  1,
+                )}{" "}
+                km
               </div>
             </Tooltip>
-          </CircleMarker>
-        );
-      })}
-
-      {/* -------------------------------------------------
-          OBSERVATION POINT
-          ------------------------------------------------- */}
-      <CircleMarker
-        center={observationCenter}
-        radius={8}
-        pathOptions={{
-          color: "#ffffff",
-          weight: 3,
-          fillColor: "#e1a743",
-          fillOpacity: 1,
-        }}
-      >
-        <Tooltip direction="top" offset={[0, -9]}>
-          <div className="text-xs">
-            <strong>Observation</strong>
-            <br />
-            0H
-            <br />
-            Radius: {getRadiusKm(observationStep).toFixed(1)} km
-          </div>
-        </Tooltip>
-      </CircleMarker>
-
-      {/* -------------------------------------------------
-          OBSERVATION → ACTIVE POSITION CONNECTOR
-          ------------------------------------------------- */}
-      {activeOffset !== 0 && activeCenter && (
-        <Polyline
-          positions={[observationCenter, activeCenter]}
-          pathOptions={{
-            color: getPhaseColor(activePhase),
-            weight: 3,
-            opacity: 0.55,
-            dashArray: "3 7",
-            lineCap: "round",
-          }}
-        />
-      )}
-
-      {/* -------------------------------------------------
-          ONLY THE ACTIVE UNCERTAINTY ENVELOPE
-          ------------------------------------------------- */}
-      {activeCenter && (
-        <Circle
-          center={activeCenter}
-          radius={activeRadiusKm * 1000}
-          pathOptions={{
-            color: getPhaseColor(activePhase),
-            weight: 3,
-            opacity: 0.9,
-            fillColor: getPhaseColor(activePhase),
-            fillOpacity: 0.13,
-            dashArray: activePhase === "Hindcast" ? "8 7" : undefined,
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -8]}>
-            <div className="text-xs">
-              <strong>Selected drift position</strong>
-              <br />
-              {activePhase} · {formatOffset(activeOffset)}
-              <br />
-              Uncertainty radius: {activeRadiusKm.toFixed(1)} km
-            </div>
-          </Tooltip>
-        </Circle>
-      )}
-
-      {/* -------------------------------------------------
-          ACTIVE DRIFT POSITION
-          ------------------------------------------------- */}
-      {activeCenter && (
-        <CircleMarker
-          center={activeCenter}
-          radius={11}
-          pathOptions={{
-            color: "#ffffff",
-            weight: 3,
-            fillColor: getPhaseColor(activePhase),
-            fillOpacity: 1,
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -12]} permanent opacity={0.95}>
-            <div className="text-xs">
-              <strong>{activePhase}</strong>
-              <br />
-              {formatOffset(activeOffset)}
-            </div>
-          </Tooltip>
-        </CircleMarker>
-      )}
-
-      {/* -------------------------------------------------
-          SELECTED POSITION → OBSERVATION LABEL
-          ------------------------------------------------- */}
-      {activeOffset !== 0 && activeCenter && (
-        <CircleMarker
-          center={activeCenter}
-          radius={17}
-          pathOptions={{
-            color: getPhaseColor(activePhase),
-            weight: 1.5,
-            opacity: 0.45,
-            fillOpacity: 0,
-          }}
-        />
-      )}
+          </Circle>
+        )}
     </>
   );
+}
+
+function circleRadiusForStep(
+  step,
+) {
+  return getRadiusKm(step);
 }

@@ -1,17 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { getMarineEyeData } from "./api/dataClient";
-
 import { getMarineEyeData as getMockMarineEyeData } from "./api/mockClient";
 
 import { FilterBar } from "./components/filters/FilterBar";
-
 import { MapShell } from "./components/map/MapShell";
-
 import { SlickDetailPanel } from "./components/panel/SlickDetailPanel";
-
 import { StatsBar } from "./components/stats/StatsBar";
-
 import { InvestigationReport } from "./components/report/InvestigationReport";
 
 import { matchesFilters, useMapStore } from "./store/useMapStore";
@@ -46,7 +41,9 @@ function ErrorState({ message, onRetry }) {
           Unable to load marine observations
         </p>
 
-        <p className="mt-2 text-[11px] leading-5 text-[#8b6f69]">{message}</p>
+        <p className="mt-2 text-[11px] leading-5 text-[#8b6f69]">
+          {message}
+        </p>
 
         <button
           type="button"
@@ -139,33 +136,20 @@ function HeaderMenu({ title, open, onToggle, children }) {
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
-
   const [dataSource, setDataSource] = useState("unknown");
-
   const [loadError, setLoadError] = useState("");
-
-  const [dataUpdatedAt, setDataUpdatedAt] = useState(null);
-
   const [reloadToken, setReloadToken] = useState(0);
-
   const [isReportOpen, setIsReportOpen] = useState(false);
-
   const [openMenu, setOpenMenu] = useState(null);
 
   const slicks = useMapStore((state) => state.slicks);
-
   const filters = useMapStore((state) => state.filters);
-
   const selectedSlickId = useMapStore((state) => state.selectedSlickId);
-
   const cursorPosition = useMapStore((state) => state.cursorPosition);
-
   const mapZoom = useMapStore((state) => state.mapZoom);
 
   const setSlicks = useMapStore((state) => state.setSlicks);
-
   const setAISTracks = useMapStore((state) => state.setAISTracks);
-
   const resetFilters = useMapStore((state) => state.resetFilters);
 
   const visibleSlicks = useMemo(
@@ -199,9 +183,6 @@ export default function App() {
         );
 
         setDataSource("backend");
-        setDataUpdatedAt(
-          response?.meta?.generatedAt ?? new Date().toISOString(),
-        );
       } catch (backendError) {
         console.warn(
           "MARIS-X API unavailable; falling back to local prototype data.",
@@ -222,17 +203,17 @@ export default function App() {
           );
 
           setDataSource("mock");
-          setDataUpdatedAt(new Date().toISOString());
         } catch (mockError) {
           if (cancelled) {
             return;
           }
 
-          console.error("MarineEye data loading failed.", mockError);
+          console.error("MARIS-X data loading failed.", mockError);
 
           setSlicks([]);
           setAISTracks([]);
           setDataSource("none");
+
           setLoadError(
             "The FastAPI service and local prototype data are both unavailable.",
           );
@@ -261,7 +242,7 @@ export default function App() {
       }}
     >
       <header
-        data-marineeye-header="true"
+        data-marisx-header="true"
         className="relative z-[2000] shrink-0 border-b border-[#cdd4ce] bg-[#f5f2e9]/98"
       >
         <div className="mx-auto flex max-w-[1800px] items-center justify-between px-5 py-2.5">
@@ -289,12 +270,12 @@ export default function App() {
             onClick={(event) => event.stopPropagation()}
           >
             <div
-              className={`hidden h-9 animate-pulse items-center gap-2 rounded-full border px-3 text-[10px] font-bold tracking-[0.1em] sm:flex ${
+              className={`hidden h-9 items-center gap-2 rounded-full border px-3 text-[10px] font-bold tracking-[0.1em] sm:flex ${
                 dataSource === "backend"
-                  ? " bg-transparent text-[#246d68]"
+                  ? "border-[#b9d9d0] text-[#246d68]"
                   : dataSource === "mock"
-                    ? " bg-transparent text-[#8a6b2e]"
-                    : " bg-transparent text-[#718083]"
+                    ? "border-[#dfd0aa] text-[#8a6b2e]"
+                    : "border-[#d0d7d3] text-[#718083]"
               }`}
             >
               <span
@@ -313,16 +294,6 @@ export default function App() {
                   ? "Prototype data"
                   : "No data"}
             </div>
-
-            {dataUpdatedAt && (
-              <span className="hidden text-[9px] text-[#879394] lg:inline">
-                Updated{" "}
-                {new Date(dataUpdatedAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            )}
 
             <HeaderMenu
               title="Help"
@@ -406,6 +377,7 @@ export default function App() {
                   <path d="M12 2.8v3h3" />
                   <path d="M8.5 10h4M8.5 13h4" />
                 </svg>
+
                 Report
               </button>
             )}
@@ -491,7 +463,7 @@ export default function App() {
             <EmptyState hasData={slicks.length > 0} />
           )}
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[600] flex  justify-between border-t border-[#b8c8c3] bg-[#f5f2e9]/90 px-3 py-2 text-[11px] text-[#637477] backdrop-blur-sm">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[600] flex justify-between border-t border-[#b8c8c3] bg-[#f5f2e9]/90 px-3 py-2 text-[11px] text-[#637477] backdrop-blur-sm">
             <span>
               {visibleSlicks.length}{" "}
               {visibleSlicks.length === 1 ? "slick" : "slicks"} in view
@@ -507,7 +479,10 @@ export default function App() {
 
             <span>
               Scale: ~
-              {Math.round(40075 / 2 ** Math.max(0, Number(mapZoom) || 0))} km
+              {Math.round(
+                40075 / 2 ** Math.max(0, Number(mapZoom) || 0),
+              )}{" "}
+              km
             </span>
           </div>
         </main>

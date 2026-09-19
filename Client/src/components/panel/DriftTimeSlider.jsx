@@ -1,303 +1,284 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { useMapStore } from "../../store/useMapStore";
 
-const safeNumber = (
-  value,
-  fallback = 0,
-) => {
+const toNumber = (value, fallback = 0) => {
   const number = Number(value);
 
-  return Number.isFinite(number)
-    ? number
-    : fallback;
+  return Number.isFinite(number) ? number : fallback;
 };
 
-const formatOffset = (
-  hours,
-) => {
-  const value =
-    safeNumber(hours);
+const getOffset = (step) =>
+  toNumber(
+    step?.t_offset_hours ??
+      step?.offset_hours ??
+      step?.hours ??
+      step?.time_offset_hours,
+    0,
+  );
 
-  if (value === 0) {
-    return "0H";
+const formatOffset = (offset) => {
+  const value = toNumber(offset);
+
+  if (value > 0) {
+    return `+${value}H`;
   }
 
-  return `${
-    value > 0 ? "+" : "−"
-  }${Math.abs(value)}H`;
+  if (value < 0) {
+    return `${value}H`;
+  }
+
+  return "0H";
 };
 
-export function DriftTimeSlider({
-  slick,
-}) {
-  const driftTimeOffset =
-    useMapStore(
-      (state) =>
-        state.driftTimeOffset,
-    );
+const getSteps = (slick) => {
+  const hindcast = Array.isArray(slick?.drift?.hindcast)
+    ? slick.drift.hindcast
+    : [];
 
-  const setDriftTimeOffset =
-    useMapStore(
-      (state) =>
-        state.setDriftTimeOffset,
-    );
+  const forecast = Array.isArray(slick?.drift?.forecast)
+    ? slick.drift.forecast
+    : [];
 
-  const steps = useMemo(() => {
-    const hindcast =
-      Array.isArray(
-        slick?.drift?.hindcast,
-      )
-        ? slick.drift.hindcast
-        : [];
+  const explicitObservation =
+    slick?.drift?.observation ?? slick?.drift?.current ?? null;
 
-    const forecast =
-      Array.isArray(
-        slick?.drift?.forecast,
-      )
-        ? slick.drift.forecast
-        : [];
+  const zeroHour = hindcast.find((step) => getOffset(step) === 0) ?? null;
 
-    return [
-      ...hindcast.map(
-        (point) => ({
-          ...point,
-          phase: "hindcast",
-        }),
-      ),
+  const observation = explicitObservation ??
+    zeroHour ?? {
+      t_offset_hours: 0,
+      phase: "Observation",
+    };
 
-      {
-        t_offset_hours: 0,
-        phase: "current",
-      },
+  const steps = [
+    ...hindcast
+      .filter((step) => getOffset(step) < 0)
+      .map((step) => ({
+        ...step,
+        offset: getOffset(step),
+        phase: "Hindcast",
+      })),
 
-      ...forecast.map(
-        (point) => ({
-          ...point,
-          phase: "forecast",
-        }),
-      ),
-    ]
-      .filter(
-        (point) =>
-          Number.isFinite(
-            Number(
-              point.t_offset_hours,
-            ),
-          ),
-      )
-      .sort(
-        (a, b) =>
-          Number(
-            a.t_offset_hours,
-          ) -
-          Number(
-            b.t_offset_hours,
-          ),
-      )
-      .filter(
-        (
-          point,
-          index,
-          list,
-        ) =>
-          index === 0 ||
-          Number(
-            point.t_offset_hours,
-          ) !==
-            Number(
-              list[
-                index - 1
-              ]
-                .t_offset_hours,
-            ),
-      );
-  }, [slick]);
+    {
+      ...observation,
+      offset: 0,
+      phase: "Observation",
+    },
+
+    ...forecast
+      .filter((step) => getOffset(step) > 0)
+      .map((step) => ({
+        ...step,
+        offset: getOffset(step),
+        phase: "Forecast",
+      })),
+  ].sort((a, b) => a.offset - b.offset);
+
+  const seen = new Set();
+
+  return steps.filter((step) => {
+    if (seen.has(step.offset)) {
+      return false;
+    }
+
+    seen.add(step.offset);
+
+    return true;
+  });
+};
+
+const getColor = (step, forecastSteps) => {
+  if (step.phase === "Hindcast") {
+    return "#6f9dad";
+  }
+
+  if (step.phase === "Observation") {
+    return "#e1a743";
+  }
+
+  const index = forecastSteps.findIndex((item) => item.offset === step.offset);
+
+  if (index === 0) {
+    return "#ef4444";
+  }
+
+  if (index === 1) {
+    return "#22c55e";
+  }
+
+  return "#2563eb";
+};
+
+export function DriftTimeSlider({ slick }) {
+  const driftTimeOffset = useMapStore((state) => state.driftTimeOffset);
+
+  const steps = useMemo(() => getSteps(slick), [slick]);
+
+  useEffect(() => {
+    if (!steps.length) {
+      return;
+    }
+
+    const current = Number(driftTimeOffset);
+
+    if (steps.some((step) => step.offset === current)) {
+      return;
+    }
+
+    useMapStore.setState({
+      driftTimeOffset: steps.some((step) => step.offset === 0)
+        ? 0
+        : steps[0].offset,
+    });
+  }, [slick?.id, steps, driftTimeOffset]);
 
   if (!steps.length) {
-    return null;
+    return (
+      <div className="rounded-xl border border-[#d5dcd7] bg-white p-4 text-[11px] text-[#819091]">
+        No drift timeline available.
+      </div>
+    );
   }
 
-  const currentOffset =
-    safeNumber(
-      driftTimeOffset,
-    );
+  let currentIndex = steps.findIndex(
+    (step) => step.offset === Number(driftTimeOffset),
+  );
 
-  const activeIndex =
-    steps.findIndex(
-      (step) =>
-        safeNumber(
-          step.t_offset_hours,
-        ) === currentOffset,
-    );
+  if (currentIndex < 0) {
+    currentIndex = steps.findIndex((step) => step.offset === 0);
 
-  const currentIndex =
-    steps.findIndex(
-      (step) =>
-        step.phase ===
-        "current",
-    );
+    if (currentIndex < 0) {
+      currentIndex = 0;
+    }
+  }
 
-  const safeIndex =
-    activeIndex === -1
-      ? Math.max(
-          0,
-          currentIndex,
-        )
-      : activeIndex;
+  const currentStep = steps[currentIndex];
 
-  const activeStep =
-    steps[safeIndex];
+  const forecastSteps = steps.filter((step) => step.phase === "Forecast");
 
-  const phaseLabel =
-    activeStep?.phase ===
-    "hindcast"
-      ? "Hindcast"
-      : activeStep?.phase ===
-          "forecast"
-        ? "Forecast"
-        : "Current observation";
-
-  const radius =
-    safeNumber(
-      activeStep?.radius_km,
-    );
+  const setOffset = (offset) => {
+    useMapStore.setState({
+      driftTimeOffset: Number(offset),
+    });
+  };
 
   return (
-    <div className="rounded-xl border border-[#d5dcd7] bg-white p-3.5">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-xl border border-[#d5dcd7] bg-white p-4">
+      <div className="flex items-start justify-between">
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#718083]">
+          <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#879394]">
             Drift timeline
           </p>
 
-          <p className="mt-1 text-[10px] text-[#879394]">
-            Scrub the modeled
-            movement envelope.
+          <p className="mt-1 text-[21px] font-semibold text-[#253642]">
+            {formatOffset(currentStep.offset)}
           </p>
+
+          <p className="text-[10px] text-[#819091]">{currentStep.phase}</p>
         </div>
 
         <div className="text-right">
-          <p className="text-base font-semibold text-[#246d68]">
-            {formatOffset(
-              activeStep?.t_offset_hours,
-            )}
+          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#879394]">
+            Uncertainty
           </p>
 
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-[#819091]">
-            {phaseLabel}
+          <p className="mt-1 text-sm font-semibold text-[#344b4e]">
+            {toNumber(
+              currentStep.radius_km ??
+                currentStep.radius ??
+                currentStep.uncertainty_radius_km,
+              5,
+            ).toFixed(1)}{" "}
+            km
           </p>
         </div>
       </div>
 
-      <input
-        aria-label="Drift timeline"
-        type="range"
-        min="0"
-        max={Math.max(
-          0,
-          steps.length - 1,
-        )}
-        step="1"
-        value={Math.max(
-          0,
-          safeIndex,
-        )}
-        onChange={(event) => {
-          const step =
-            steps[
-              Number(
-                event.target.value,
-              )
-            ];
+      <div className="relative mt-6">
+        <div className="pointer-events-none absolute left-0 right-0 top-[7px] flex h-[3px] overflow-hidden rounded-full">
+          {steps.slice(0, -1).map((step, index) => (
+            <span
+              key={`segment-${step.offset}`}
+              className="min-w-0 flex-1"
+              style={{
+                backgroundColor: getColor(steps[index + 1], forecastSteps),
+              }}
+            />
+          ))}
+        </div>
 
-          setDriftTimeOffset(
-            safeNumber(
-              step?.t_offset_hours,
-            ),
-          );
-        }}
-        className="marineeye-range mt-4 w-full"
-      />
+        <input
+          aria-label="Drift timeline"
+          type="range"
+          min="0"
+          max={steps.length - 1}
+          step="1"
+          value={currentIndex}
+          onChange={(event) => {
+            const index = Number(event.target.value);
 
-      <div className="mt-1 flex justify-between text-[8px] font-medium text-[#819091]">
+            const step = steps[index];
+
+            if (step) {
+              setOffset(step.offset);
+            }
+          }}
+          className="marineeye-range relative z-10 w-full"
+        />
+
+        <div className="pointer-events-none absolute left-0 right-0 top-[3px] flex justify-between">
+          {steps.map((step, index) => {
+            const color = getColor(step, forecastSteps);
+
+            const active = index === currentIndex;
+
+            return (
+              <span
+                key={`dot-${step.offset}`}
+                className="h-3.5 w-3.5 -translate-x-1/2 rounded-full border-2 border-white"
+                style={{
+                  backgroundColor: color,
+                  boxShadow: active ? `0 0 0 2px ${color}` : undefined,
+                }}
+              />
+            );
+          })}
+        </div>
+
+        <div className="mt-3 grid grid-cols-9">
+          {steps.map((step) => (
+            <button
+              key={`label-${step.offset}`}
+              type="button"
+              onClick={() => setOffset(step.offset)}
+              className={`text-center text-[8px] font-semibold ${
+                step.offset === currentStep.offset
+                  ? "text-[#246d68]"
+                  : "text-[#879394]"
+              }`}
+            >
+              {formatOffset(step.offset)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-[#edf0ed] pt-3 text-[9px] text-[#819091]">
         <span>
-          {formatOffset(
-            steps[0]
-              ?.t_offset_hours,
-          )}
+          {steps.filter((step) => step.phase === "Hindcast").length} hindcast
         </span>
 
-        <span>0H</span>
+        <span>1 observation</span>
 
         <span>
-          {formatOffset(
-            steps[
-              steps.length - 1
-            ]?.t_offset_hours,
-          )}
+          {steps.filter((step) => step.phase === "Forecast").length} forecast
         </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[#e4e8e4] pt-3">
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-[#879394]">
-            Phase
-          </p>
-
-          <p className="mt-1 text-[10px] font-semibold text-[#344b4e]">
-            {phaseLabel}
-          </p>
-        </div>
-
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-[#879394]">
-            Step
-          </p>
-
-          <p className="mt-1 text-[10px] font-semibold text-[#344b4e]">
-            {safeIndex + 1}/
-            {steps.length}
-          </p>
-        </div>
-
-        <div>
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-[#879394]">
-            Radius
-          </p>
-
-          <p className="mt-1 text-[10px] font-semibold text-[#344b4e]">
-            {radius
-              ? `${radius.toFixed(
-                  1,
-                )} km`
-              : "—"}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center gap-3 text-[8px] text-[#718083]">
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#7f9ca3]" />
-          Hindcast
-        </span>
-
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#efbd62]" />
-          Observation
-        </span>
-
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#45a99a]" />
-          Forecast
-        </span>
-      </div>
-
-      <p className="mt-3 text-[8px] leading-4 text-[#8a9798]">
-        Demo drift values are
-        deterministic visualization
-        fixtures, not scientific
-        ocean-current predictions.
+      <p className="mt-3 text-[9px] leading-4 text-[#819091]">
+        Click a drift point to show its uncertainty circle. Click elsewhere on
+        the map to hide it. Changing the timeline selects that hour.
       </p>
     </div>
   );
