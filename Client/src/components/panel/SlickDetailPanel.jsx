@@ -158,14 +158,33 @@ export function SlickDetailPanel({ slick }) {
     setSelectedSourceId(sourceId);
   };
 
-  const hindcast = Array.isArray(slick?.drift?.hindcast)
-    ? slick.drift.hindcast
-    : [];
+const hindcast = Array.isArray(slick?.drift?.hindcast)
+  ? slick.drift.hindcast
+  : [];
 
-  const forecast = Array.isArray(slick?.drift?.forecast)
-    ? slick.drift.forecast
-    : [];
+const forecast = Array.isArray(slick?.drift?.forecast)
+  ? slick.drift.forecast
+  : [];
 
+const hindcastSteps = hindcast.filter(
+  (step) =>
+    Number(
+      step?.t_offset_hours ??
+        step?.offset_hours ??
+        step?.hours ??
+        0,
+    ) < 0,
+);
+
+const forecastSteps = forecast.filter(
+  (step) =>
+    Number(
+      step?.t_offset_hours ??
+        step?.offset_hours ??
+        step?.hours ??
+        0,
+    ) > 0,
+);
   return (
     <div className="min-h-full bg-[#f8f6ef]">
       <div className="border-b border-[#d5dcd7] px-4 pb-3 pt-3">
@@ -268,35 +287,34 @@ export function SlickDetailPanel({ slick }) {
                 {safeNumber(slick.age_estimate).toFixed(1)} hours
               </span>
             </div>
+<div className="mt-2 flex items-center justify-between px-1 text-[10px] text-[#819091]">
+  <span>
+    {hindcastSteps.length} hindcast steps
+  </span>
 
-            <div className="mt-2 flex items-start justify-between gap-3">
-              <span>Acquisition</span>
+  <span>
+    1 observation
+  </span>
 
-              <span className="text-right font-semibold text-[#33474b]">
-                {formatDate(slick.timestamp)}
-              </span>
-            </div>
+  <span>
+    {forecastSteps.length} forecast steps
+  </span>
+</div>
           </div>
         </section>
 
         <section>
           <div className="mb-3">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#718083]">
-              Drift analysis
-            </p>
+    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#718083]">
+      Drift analysis
+    </p>
 
-            <p className="mt-1 text-[11px] leading-4 text-[#819091]">
-              Hindcast → observation → forecast movement envelope.
-            </p>
-          </div>
+    <p className="mt-1 text-[11px] leading-4 text-[#819091]">
+      Hindcast → observation → forecast movement envelope.
+    </p>
+  </div>
 
-          <DriftTimeSlider slick={slick} />
-
-          <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-[#819091]">
-            <span>{hindcast.length} hindcast steps</span>
-
-            <span>{forecast.length} forecast steps</span>
-          </div>
+  <DriftTimeSlider slick={slick} />
         </section>
 
         <section>
