@@ -146,7 +146,7 @@ export function DateRangeFilter({ value, onChange }) {
 
     const bounds = trigger.getBoundingClientRect();
     const popupWidth = Math.min(800, window.innerWidth - 24);
-    const header = document.querySelector("[data-marineeye-header]");
+    const header = document.querySelector("[data-marisx-header]");
     const headerBottom = header?.getBoundingClientRect().bottom ?? 0;
 
     setPopupPosition({

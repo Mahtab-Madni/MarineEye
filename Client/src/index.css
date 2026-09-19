@@ -72,6 +72,32 @@ input {
   outline: none;
 }
 
+.marineeye-location-icon {
+  border: 0;
+  background: transparent;
+}
+
+.marineeye-location-pin {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 3px solid #ffffff;
+  border-radius: 50% 50% 50% 0;
+  background: #0f766e;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+  transform: rotate(-45deg);
+}
+
+.marineeye-location-pin::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin: 5px auto;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
 /* =========================================================
    GENERIC SLIDERS
    ========================================================= */
